@@ -1,0 +1,36 @@
+[package]
+name = "agent"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[features]
+default = []
+no_service = []
+
+[dependencies]
+windows-service = "0.6.0"
+chaos-core = { "path" = "../common" }
+sled = "0.34.7"
+serde_json = {workspace = true}
+log = "0.4.20"
+log4rs = "1.2.0"
+ureq = {version = "2.9.1", default_features = false, features = ["json"]}
+
+[dependencies.windows]
+version = "0.52"
+features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Services",
+    "Win32_System_SystemInformation",
+    "Win32_System_Shutdown",
+    "Win32_System_WindowsProgramming"
+]
+
+[dependencies.uuid]
+version = "1"
+features = [
+    "v4",
+    "fast-rng"
+]

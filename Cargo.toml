@@ -1,0 +1,21 @@
+[workspace]
+members = [
+    "agent", 
+    "common", "server", "user",
+    "xtask",
+]
+resolver = "2"
+default-members = ["agent", "common"]
+
+[workspace.package]
+name = "chaos-bench"
+version = "0.1.0"
+authors = ["Samuel Garces<samuel.garcés@protonmail.com>"]
+edition = "2021"
+repository = "https://github.com/SecSamDev/chaos-bench.git"
+
+[workspace.dependencies]
+anyhow = "*"
+serde = { version = "1", features = ["derive"]}
+serde_json = { version = "1" }
+serde_yaml = "0"
