@@ -1,37 +1,39 @@
 use chaos_core::{action::install::{InstallParameters, InstallWithErrorParameters}, parameters::TestParameters, err::ChaosResult};
 
+use crate::common::create_file_path_in_workspace;
+
 pub fn execute_install(parameters: &TestParameters) -> ChaosResult<()> {
     let parameters: InstallParameters = parameters.try_into().unwrap();
     let mut command = std::process::Command::new(r"C:\Windows\System32\msiexec.exe");
-    let log_location = std::env::current_dir().unwrap().join("install.log");
+    let log_location = create_file_path_in_workspace("install.log");
     command
         .arg("/i")
         .arg(&parameters.installer)
         .arg("/qn")
         .arg("/l*v")
         .arg(log_location.as_os_str());
-    let status = parse_msi_result(command.status().unwrap().code().unwrap_or_default());
+    let _status = parse_msi_result(command.status().unwrap().code().unwrap_or_default());
     Ok(())
 }
 
 pub fn execute_uninstall(parameters: &TestParameters)-> ChaosResult<()> {
     let parameters: InstallParameters = parameters.try_into().unwrap();
     let mut command = std::process::Command::new(r"C:\Windows\System32\msiexec.exe");
-    let log_location = std::env::current_dir().unwrap().join("uninstall.log");
+    let log_location = create_file_path_in_workspace("uninstall.log");
     command
         .arg("/x")
         .arg(&parameters.installer)
         .arg("/qn")
         .arg("/l*v")
         .arg(log_location.as_os_str());
-    let status = parse_msi_result(command.status().unwrap().code().unwrap_or_default());
+    let _status = parse_msi_result(command.status().unwrap().code().unwrap_or_default());
     Ok(())
 }
 
 pub fn execute_install_with_error(parameters: &TestParameters) -> ChaosResult<()>{
     let parameters: InstallWithErrorParameters = parameters.try_into().unwrap();
     let mut command = std::process::Command::new(r"C:\Windows\System32\msiexec.exe");
-    let log_location = std::env::current_dir().unwrap().join("uninstall.log");
+    let log_location = create_file_path_in_workspace("uninstall.log");
     command
         .arg("/x")
         .arg(&parameters.installer)
@@ -40,7 +42,7 @@ pub fn execute_install_with_error(parameters: &TestParameters) -> ChaosResult<()
         .arg(log_location.as_os_str());
     let install_status = command.status().unwrap().code().unwrap_or_default();
     assert_eq!(parameters.error, install_status);
-    let status = parse_msi_result(install_status);
+    let _status = parse_msi_result(install_status);
     Ok(())
 }
 

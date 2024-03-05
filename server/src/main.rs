@@ -1,7 +1,10 @@
-use std::{path::PathBuf, fs::create_dir_all, sync::Arc, rc::Rc};
+use std::{fs::create_dir_all, path::PathBuf, rc::Rc, sync::{Arc, Mutex}};
 
+use actix::{Actor, Addr};
 use actix_web::{HttpServer, App, web::Data, middleware::Logger};
+use actors::logs::LogServer;
 use chaos_core::scenario::TestScenario;
+use repository::memory::{Database, MemoryRepository};
 use services::production::ProductionService;
 use state::ServerState;
 use telemetry::init_logging;
@@ -15,20 +18,25 @@ pub mod actors;
 
 const DEFAULT_SERVER_PORT: u16 = 8080;
 
-#[tokio::main]
+#[actix_web::main]
 async fn main() -> std::io::Result<()> {
     init_logging();
     let (address, port) = listening_parameters();
     log::info!("Listening on: {}:{}", address, port);
     let scenarios = Arc::new(read_test_scenarios());
     log::info!("Loaded {} scenarios", scenarios.len());
+    let database = read_database();
+    let db = database.clone();
+    let log_server = LogServer::new().start();
+    log::info!("Started logserver");
     let server = HttpServer::new(move || {
         App::new()
-            .app_data(Data::new(create_server_state(&scenarios)))
+            .app_data(Data::new(create_server_state(&scenarios, &database, &log_server)))
             .wrap(Logger::default())
             .configure(controllers::config)
     });
     let _ = server.bind((address, port))?.run().await;
+    db.lock().unwrap().save();
     Ok(())
 }
 
@@ -40,10 +48,11 @@ pub fn listening_parameters() -> (String, u16) {
     (address, port)
 }
 
-pub fn create_server_state(scenarions : &Arc<Vec<TestScenario>>) -> ServerState {
+pub fn create_server_state(scenarios : &Arc<Vec<TestScenario>>, db : &Arc<Mutex<Database>>, log_server : &Addr<LogServer>) -> ServerState {
     ServerState {
-        services: Rc::new(ProductionService::new()),
-        scenarios : scenarions.clone()
+        services: Rc::new(ProductionService::new(MemoryRepository::new(db, scenarios))),
+        scenarios : scenarios.clone(),
+        log_server : log_server.clone()
     }
 }
 
@@ -70,4 +79,8 @@ pub fn read_test_scenarios() -> Vec<TestScenario> {
         }
     }
     ret
+}
+
+pub fn read_database() -> Arc<Mutex<Database>> {
+    Arc::new(Mutex::new(Database::load()))
 }

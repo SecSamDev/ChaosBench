@@ -1,7 +1,7 @@
 use std::time::{Instant, Duration};
 
 use chaos_core::{action::service::ServiceCommand, parameters::TestParameters, err::{ChaosResult, ChaosError}};
-use windows::{Win32::{System::Services::{OpenServiceW, OpenSCManagerW, SC_MANAGER_CONNECT, SC_MANAGER_ENUMERATE_SERVICE, SERVICE_INTERROGATE, SERVICE_CONTROL_STOP, CloseServiceHandle, ControlService, SERVICE_STATUS, StartServiceW, SERVICE_START, NotifyServiceStatusChangeW, QueryServiceStatus, SERVICE_STOPPED, SERVICE_RUNNING, SERVICE_START_PENDING}, Security::SC_HANDLE, Foundation::CloseHandle}, core::PCWSTR};
+use windows::{Win32::{System::Services::{OpenServiceW, OpenSCManagerW, SC_MANAGER_CONNECT, SC_MANAGER_ENUMERATE_SERVICE, SERVICE_INTERROGATE, SERVICE_CONTROL_STOP, CloseServiceHandle, ControlService, SERVICE_STATUS, StartServiceW, SERVICE_START, QueryServiceStatus, SERVICE_STOPPED, SERVICE_START_PENDING}, Security::SC_HANDLE}, core::PCWSTR};
 
 pub fn stop_service(parameters: &TestParameters) -> ChaosResult<()> {
     let parameters: ServiceCommand = parameters.try_into().unwrap();
@@ -134,7 +134,7 @@ fn control_service(name : &str, control : u32) -> ChaosResult<()> {
 
 fn set_service(handle : SC_HANDLE, control : u32) -> ChaosResult<()> {
     let mut status = SERVICE_STATUS::default();
-    if let Err(err) = unsafe { ControlService(handle, control, &mut status) } {
+    if let Err(_err) = unsafe { ControlService(handle, control, &mut status) } {
         return Err(ChaosError::Unknown)
     }
     Ok(())
@@ -144,7 +144,7 @@ fn close_service_handle(handle : SC_HANDLE) {
     let _ = unsafe { CloseServiceHandle(handle) };
 }
 
-fn open_service(name : &str) -> ChaosResult<SC_HANDLE> {
+fn _open_service(name : &str) -> ChaosResult<SC_HANDLE> {
     let sc_manager = get_manager_handle()?;
     match open_service_with_manager(name, sc_manager) {
         Ok(v) => Ok(v),

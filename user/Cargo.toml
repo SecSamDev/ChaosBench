@@ -8,5 +8,6 @@ edition.workspace = true
 
 [dependencies]
 chaos-core = { "path" = "../common" }
-websocket = {version = "0.27.0", default_features = false, features = ["sync"]}
+websocket = {workspace = true}
 serde_json = {workspace = true}
+dialoguer = {version = "0.11", features = ["history", "completion"]}

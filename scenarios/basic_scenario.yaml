@@ -1,0 +1,105 @@
+name: Pruebas Full
+description: Todas las pruebas
+parameters:
+  app_version: "1.2.0"
+  targets: 
+    - "arch:x86"
+    - "arch:x64"
+    - "name!:.*Debug.*"
+  user_name: CNCMS\TestUser # Usuario necesario para iniciar sesión interactiva de usuario
+  user_password: TestUser123$ # Contraseña del usuario de pruebas
+
+  # Si la app tiene un servicio queremos saber el nombre o nombres. Usado por StartAppService que es un alias de StartService $name
+  service_name: superprogram 
+
+  install_parameters:
+    SERVER: 10.0.0.2:443
+    API_KEY: 12345
+  # Para pruebas de parámetros erróneos
+  install_error_parameters:
+    SERVER: not_a_hostname:123:123
+    API_KEY: null
+  # (Opcional) Todo lo de después de /i xxx.msi /qn ..
+  install_command: /lv install_log.txt SERVER=10.0.0.2 API_KEY=12345 
+  # Custom command para desinstalar
+  uninstall_command: ... 
+  # Custom parameters para desinstalar
+  uninstall_parameters:
+    force: true
+  # Informar sobre los ficheros que utiliza nuestra aplicación para facilitar limpieza
+  application_folders:
+    - C:\Program Files\program
+    - C:\ProgramData\program
+    - "%APPDATA%\\Temp\\program"
+  # https://serverfault.com/questions/813506/setting-environment-variable-for-service
+  service_env_vars: # Variables de entorno extra que se inyectarán en el servicio de la aplicación
+    # Estas siguientes las hará sola la aplicación para poder guardar artefactos que genere la app a testear
+    TEMP: C:\ProgramData\chaos\app_temp
+    TMP: C:\ProgramData\chaos\app_temp
+  user_env_vars: # Variables de entorno extra para la sesión de usuario
+    TEMP: C:\ProgramData\chaos\user_temp
+    TMP: C:\ProgramData\chaos\user_temp
+
+variables:
+  application_folder: C:\Program Files\program
+files:
+  - "Superprogram file.exe"
+actions:
+  - name: UninstallWithUninstaller
+    action: Execute
+    parameters:
+      command: "$application_folder\\uninstaller.exe --force"
+
+scenario:
+  cleanup:
+    phase:
+      - RestartMachine
+
+scene_preparation:
+  phase_timeout: 10s # Por defecto una fase no debe durar más de 10 segundos
+  cleanup:
+    actions:
+      - Uninstall
+      - CleanFolders
+      - ResetEnvVars
+      - CloseUserSession
+  before: #Antes de ejecutar un escenario
+    actions:
+      - CleanFolders # Limpia todos los directorios de la APP
+      - SetupEnvVars
+  after_first: # Después de ejecutar la primera fase de un escenario
+    actions: []
+  before_last: # Antes de ejecutar la ultima fase de un escenario
+    actions:
+      - ExtractApplicationData
+  after: # Ejecutar al final de un escenario
+    actions:
+      - CleanTmpFolder
+      - ResetEnvVars
+      - CloseUserSession
+
+scenes:
+  - name: Simple Install/Uninstall
+    description: La aplicación se debe instalar y desinstalar
+    phases:
+      - Install
+      - StartUserSession
+      - Uninstall
+
+  - name: Install y Uninstall desde uninstaller.exe
+    description: La aplicación se debe instalar y desinstalar
+    phases:
+      - Install
+      - UninstallWithUninstaller
+  - name: Instalar y actualizar a través del servidor
+    description: La aplicación debe actualizarse de forma automática
+    phases:
+      - Install
+      - UpdateByWeb # Custom command que se ejecuta en la web
+      - RestartService
+  - name: Instalar e instalar encima
+    description: La aplicación se debe instalar y debe no dejar instalar encima de la que ya hay
+    phases:
+      - Install
+      - InstallAlredyInstalledError # Prueba a instalar la aplicación y debe fallar
+      - InstallParameterError # Prueba a instalar con parámetros erroneos

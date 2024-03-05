@@ -1,4 +1,4 @@
-use chaos_core::{parameters::TestParameters, err::{ChaosResult, ChaosError}, action::{TestActionType, CustomAction}, tasks::AgentTask};
+use chaos_core::{parameters::TestParameters, err::{ChaosResult, ChaosError}, action::TestActionType, tasks::AgentTask};
 
 use crate::{common::now_milliseconds, state::AgentState};
 

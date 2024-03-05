@@ -2,6 +2,8 @@ use serde::{Serialize, Deserialize};
 
 use crate::tasks::AgentTask;
 
+use super::Log;
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ConnectAgentRequest {
 
@@ -34,4 +36,9 @@ pub struct NextTaskForAgentReq {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct NextTaskForAgentRes {
     pub task : Option<AgentTask>
+}
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AgentLogReq {
+    pub log : Log,
+    pub agent : String
 }

@@ -17,7 +17,7 @@ pub const GLOBAL_PARAMETERS: &str = "parameters";
 pub const CUSTOM_ACTIONS: &str = "custom_actions";
 pub const CURRENT_TASK: &str = "current_task";
 
-const SERVER_ADDRESS : &str = env!("AGENT_SERVER_ADDRESS");
+pub const SERVER_ADDRESS : &str = env!("AGENT_SERVER_ADDRESS");
 
 /// Save the state of the agent in the database
 pub struct AgentState {

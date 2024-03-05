@@ -9,15 +9,20 @@ default = []
 no_service = []
 
 [dependencies]
-windows-service = "0.6.0"
 chaos-core = { "path" = "../common" }
 sled = "0.34.7"
 serde_json = {workspace = true}
 log = "0.4.20"
 log4rs = "1.2.0"
 ureq = {version = "2.9.1", default_features = false, features = ["json"]}
+uuid = { version = "1", features = ["v4", "fast-rng"] }
+websocket = {workspace = true}
+anyhow = "*"
 
-[dependencies.windows]
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-service = "0.6.0"
+
+[target.'cfg(target_os = "windows")'.dependencies.windows]
 version = "0.52"
 features = [
     "Win32_Foundation",
@@ -28,9 +33,5 @@ features = [
     "Win32_System_WindowsProgramming"
 ]
 
-[dependencies.uuid]
-version = "1"
-features = [
-    "v4",
-    "fast-rng"
-]
+[target.'cfg(target_os = "linux")'.dependencies]
+nix = { version = "0.26", features = ["signal"]}
