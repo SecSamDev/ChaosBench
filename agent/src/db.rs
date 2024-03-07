@@ -3,9 +3,11 @@ use std::collections::BTreeMap;
 use chaos_core::{action::CustomAction, parameters::TestParameters, tasks::AgentTask};
 use serde::{Deserialize, Serialize};
 
+use crate::common::AgentTaskInternal;
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Database {
-    pub current_task : Option<AgentTask>,
+    pub current_task : Option<AgentTaskInternal>,
     pub parameters : TestParameters,
     pub commands : Vec<CustomAction>
 }
@@ -20,11 +22,26 @@ impl Database {
         let database = serde_json::to_string(&self).unwrap_or_default();
         std::fs::write("./state.db", database.as_bytes()).unwrap_or_default();
     }
-    pub fn get_current_task(&self) -> Option<&AgentTask> {
+    pub fn get_current_task(&self) -> Option<&AgentTaskInternal> {
         self.current_task.as_ref()
     }
+    pub fn update_current_task(&mut self, task : AgentTaskInternal) {
+        self.current_task = Some(task);
+    }
     pub fn set_current_task(&mut self, task: Option<AgentTask>) {
-        self.current_task = task;
+        self.current_task = task.map(|v| AgentTaskInternal {
+            action : v.action,
+            agent : v.agent,
+            end : None,
+            id : v.id,
+            limit : v.limit,
+            parameters : v.parameters,
+            result : None,
+            start : 0
+        });
+    }
+    pub fn set_global_parameters(&mut self, params : TestParameters) {
+        self.parameters = params;
     }
     pub fn get_global_parameters(&self) -> &TestParameters {
         &self.parameters

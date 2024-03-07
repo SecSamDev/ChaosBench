@@ -1,6 +1,17 @@
-use std::{time::Duration, fmt};
+use std::{fmt, hash::{Hash, Hasher}, time::Duration};
 
 use serde::{Deserializer, Deserialize, de::{Visitor, Unexpected}};
+
+use crate::{action::CustomAction, parameters::TestParameters};
+
+pub fn hash_params_and_actions(params : &TestParameters, actions : &[CustomAction]) -> u64 {
+    let mut state = std::collections::hash_map::DefaultHasher::new();
+    params.hash(&mut state);
+    for action in actions {
+        action.hash(&mut state);
+    }
+    state.finish()
+}
 
 pub fn deserialize_null_default<'de, D, T>(d: D) -> Result<T, D::Error>
     where 

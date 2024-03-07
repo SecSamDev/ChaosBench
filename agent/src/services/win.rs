@@ -36,7 +36,7 @@ fn service_main(arguments: Vec<OsString>) {
 
 fn run_service(_arguments: Vec<OsString>) -> Result<(), windows_service::Error> {
     let (shutdown_s, shutdown_r) = std::sync::mpsc::sync_channel(32);
-
+    let signal_s = shutdown_s.clone();
     #[cfg(not(feature="no_service"))]
     let event_handler = move |control_event| -> ServiceControlHandlerResult {
         match control_event {
@@ -62,7 +62,7 @@ fn run_service(_arguments: Vec<OsString>) -> Result<(), windows_service::Error> 
     set_service_status_as_starting(&status_handle)?;
     #[cfg(not(feature="no_service"))]
     set_service_status_as_running(&status_handle)?;
-    wait_for_service_signal(shutdown_r);
+    wait_for_service_signal(signal_s, shutdown_r);
     #[cfg(not(feature="no_service"))]
     set_service_status_as_stopping(&status_handle)?;
     #[cfg(not(feature="no_service"))]

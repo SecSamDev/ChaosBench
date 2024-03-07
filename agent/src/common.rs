@@ -1,5 +1,20 @@
 use std::{path::PathBuf, time::{UNIX_EPOCH, SystemTime}};
 
+use chaos_core::{action::TestActionType, err::ChaosError, parameters::TestParameters, tasks::AgentTaskResult};
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct AgentTaskInternal {
+    pub id : u32,
+    pub agent : String,
+    pub limit : i64,
+    pub start : i64,
+    pub end : Option<i64>,
+    pub action : TestActionType,
+    pub parameters : TestParameters,
+    pub result : Option<Result<(), ChaosError>> 
+}
+
 pub enum StopCommand {
     Shutdown,
     Stop
@@ -15,7 +30,11 @@ pub fn get_home() -> PathBuf {
 }
 
 pub fn set_home() {
-    std::env::set_current_dir(get_home()).expect("Must configure current dir for agent");
+    let home = get_home();
+    if !home.exists() {
+        std::fs::create_dir_all(&home).unwrap();
+    }
+    std::env::set_current_dir(home).expect("Must configure current dir for agent");
 }
 /// Creates a new file in the workspace
 pub fn create_file_path_in_workspace(filename : &str) -> PathBuf {
@@ -32,4 +51,34 @@ pub fn create_file_path_in_app_temp(filename : &str) -> PathBuf {
 /// Creates a new file in the User temp workspace
 pub fn create_file_path_in_user_temp(filename : &str) -> PathBuf {
     std::env::current_dir().unwrap().join("user_temp").join(filename)
+}
+
+impl From<AgentTaskInternal> for AgentTaskResult {
+    fn from(v: AgentTaskInternal) -> Self {
+        AgentTaskResult {
+            action : v.action,
+            agent : v.agent,
+            end : v.end.unwrap_or_default(),
+            id : v.id,
+            limit : v.limit,
+            parameters : v.parameters,
+            result : v.result.unwrap_or_else(|| Ok(())),
+            start : v.start
+        }
+    }
+}
+
+impl From<&AgentTaskInternal> for AgentTaskResult {
+    fn from(v: &AgentTaskInternal) -> Self {
+        AgentTaskResult {
+            action : v.action.clone(),
+            agent : v.agent.clone(),
+            end : v.end.unwrap_or_default(),
+            id : v.id,
+            limit : v.limit,
+            parameters : v.parameters.clone(),
+            result : v.result.clone().unwrap_or_else(|| Ok(())),
+            start : v.start
+        }
+    }
 }

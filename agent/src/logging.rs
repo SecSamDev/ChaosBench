@@ -1,70 +1,19 @@
 use std::sync::mpsc::{Receiver, SyncSender as Sender};
 use std::time::Duration;
 use std::io::Write;
-use chaos_core::api::agent::AgentLogReq;
-use chaos_core::api::Log;
+use chaos_core::api::agent::AgentRequest;
 use log::LevelFilter;
-use log4rs::append::console::ConsoleAppender;
+
 use log4rs::append::file::FileAppender;
 use log4rs::append::Append;
 use log4rs::encode::pattern::PatternEncoder;
-use log4rs::config::{Appender, Config, Logger, Root};
+use log4rs::config::{Appender, Config, Root};
 use log4rs::encode::Encode;
-use websocket::OwnedMessage;
 
 use crate::sys_info::get_system_uuid;
 
-pub fn init_remote_logging(receiver : Receiver<String>) {
-    use crate::state::SERVER_ADDRESS;
-
-    let route = format!("ws://{}/agent/connect", SERVER_ADDRESS);
-    
-    let agent = get_system_uuid().unwrap();
-
-    std::thread::spawn(move || {
-        loop {
-            let mut msg = String::with_capacity(1024);
-            let mut client = match websocket::ClientBuilder::new(&route){
-                Ok(v) => v,
-                Err(_) => {
-                    std::thread::sleep(Duration::from_secs_f32(20.0));
-                    continue
-                }
-            };
-            let mut client = match client.connect_insecure() {
-                Ok(v) => v,
-                Err(_) => {
-                    std::thread::sleep(Duration::from_secs_f32(20.0));
-                    continue
-                }
-            };
-            loop {
-                let log = receiver.recv().unwrap();
-                msg.push_str(&log);
-                if !log.contains("\n") {
-                    continue;
-                }
-                let rq = AgentLogReq {
-                    agent : agent.clone(),
-                    log : Log {
-                        agent : agent.clone(),
-                        file : String::new(),
-                        msg
-                    }
-                };
-                msg = String::with_capacity(1024);
-                let bin = OwnedMessage::Binary(serde_json::to_vec(&rq).unwrap());
-                if let Err(_) = client.send_message(&bin) {
-                    break
-                }
-            }
-        }
-    });
-
-}
-
 #[cfg(not(feature="no_service"))]
-pub fn init_logging() {
+pub fn init_logging() -> Option<Receiver<String>> {
     let pattern = "{d(%Y-%m-%d %H:%M:%S)} | {T} | {({l}):5.5} | {m}{n}";
     let requests = FileAppender::builder()
         .encoder(Box::new(PatternEncoder::new(pattern)))
@@ -75,7 +24,6 @@ pub fn init_logging() {
         Box::new(PatternEncoder::new(pattern)),
         sender.clone(),
     );
-    init_remote_logging(receiver);
     let config = Config::builder()
         .appender(Appender::builder().build("agent", Box::new(requests)))
         .appender(Appender::builder().build("api", Box::new(apiappender)))
@@ -83,10 +31,13 @@ pub fn init_logging() {
         .unwrap();
 
     let _handle = log4rs::init_config(config).unwrap();
+    Some(receiver)
 }
 
 #[cfg(feature="no_service")]
-pub fn init_logging() {
+pub fn init_logging() -> Option<Receiver<String>> {
+    use log4rs::append::console::ConsoleAppender;
+
     let stdout = ConsoleAppender::builder().build();
     let pattern = "{d(%Y-%m-%d %H:%M:%S)} | {T} | {({l}):5.5} | {m}{n}";
     let requests = FileAppender::builder()
@@ -98,7 +49,6 @@ pub fn init_logging() {
         Box::new(PatternEncoder::new(pattern)),
         sender.clone(),
     );
-    init_remote_logging(receiver);
     let config = Config::builder()
         .appender(Appender::builder().build("stdout", Box::new(stdout)))
         .appender(Appender::builder().build("agent", Box::new(requests)))
@@ -106,7 +56,8 @@ pub fn init_logging() {
         .build(Root::builder().appender("agent").appender("stdout").appender("api").build(LevelFilter::Info))
         .unwrap();
 
-    let handle = log4rs::init_config(config).unwrap();
+    let _handle = log4rs::init_config(config).unwrap();
+    Some(receiver)
 }
 
 

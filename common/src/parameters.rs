@@ -7,7 +7,7 @@ use serde::{
 
 use crate::common::string_to_duration;
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, Hash)]
 pub struct TestParameters {
     #[serde(flatten)]
     pub(crate) parameters: BTreeMap<String, TestParameter>,
@@ -247,5 +247,31 @@ impl TryFrom<&TestParameter> for Duration {
             TestParameter::Text(v) => string_to_duration(v).ok_or("Invalid duration string")?,
             _ => return Err("Invalid duration value")
         })
+    }
+}
+
+impl std::hash::Hash for TestParameter {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            TestParameter::Text(v) => v.hash(state),
+            TestParameter::Bool(v) => v.hash(state),
+            TestParameter::U64(v) => v.hash(state),
+            TestParameter::I64(v) => v.hash(state),
+            TestParameter::F64(v) => {
+                state.write(&v.to_le_bytes());
+            }
+            TestParameter::Obj(map) => {
+                for (k,v) in map {
+                    state.write(k.as_bytes());
+                    v.hash(state);
+                }
+            }
+            TestParameter::Vec(v) => {
+                for param in v {
+                    param.hash(state);
+                }
+            }
+            TestParameter::Null => state.write_u8(0)
+        }
     }
 }

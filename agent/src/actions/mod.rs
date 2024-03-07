@@ -1,6 +1,6 @@
 use chaos_core::{parameters::TestParameters, err::{ChaosResult, ChaosError}, action::TestActionType, tasks::AgentTask};
 
-use crate::{common::now_milliseconds, state::AgentState};
+use crate::{common::{now_milliseconds, AgentTaskInternal}, state::AgentState};
 
 pub mod installation;
 pub mod service;
@@ -9,7 +9,7 @@ pub mod workspace;
 
 /// Ejecutar una acción que viene desde el servidor, la idea es que esto produzca un TaskResult que se pueda enviar de vuelta al servidor
 /// Además es necesario guardar el estado de la operación en una bbdd local, así como también la sobreescritura de acciones.
-pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, task : &mut AgentTask) -> ChaosResult<()> {
+pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, task : &mut AgentTaskInternal) -> ChaosResult<()> {
     let global_parameters = state.db.get_global_parameters();
     let commands = state.db.get_commands();
     let mut parameters = global_parameters.clone();
@@ -52,10 +52,7 @@ pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, t
         TestActionType::Null => Ok(()),
         TestActionType::Custom(action) => Err(chaos_core::err::ChaosError::Other(format!("Custom action {} not found", action))),
     };
-    task.result = Some(match res {
-        Ok(_) => Ok(()),
-        Err(e) => Err(format!("{:?}",e))
-    });
+    task.result = Some(res);
     task.end = Some(now_milliseconds());
     if TestActionType::RestartHost == action {
         task.end = None;

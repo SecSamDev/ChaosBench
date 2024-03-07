@@ -17,6 +17,4 @@ pub struct Disconnect {
 
 #[derive(Serialize, ActixMessage)]
 #[rtype(result = "()")]
-pub struct AgentLog {
-    pub msg: Log,
-}
+pub struct AgentLog(pub Log);

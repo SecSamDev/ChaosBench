@@ -16,7 +16,7 @@ log = "0.4.20"
 log4rs = "1.2.0"
 ureq = {version = "2.9.1", default_features = false, features = ["json"]}
 uuid = { version = "1", features = ["v4", "fast-rng"] }
-websocket = {workspace = true}
+tungstenite = {workspace = true}
 anyhow = "*"
 
 [target.'cfg(target_os = "windows")'.dependencies]

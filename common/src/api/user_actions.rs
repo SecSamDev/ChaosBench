@@ -10,6 +10,7 @@ use super::Log;
 pub enum UserAction {
     BackupDB(String),
     Logs,
+    NoLogs,
     StartScenario(String),
     StopScenario(String),
     CreateScenario(CreateScenario),

@@ -11,12 +11,9 @@ use windows::{
 pub fn get_hostname() -> ChaosResult<String> {
     let mut buffer = [0u16; 1024];
     let mut size = 0;
-    unsafe {
-        match GetComputerNameW(PWSTR(buffer.as_mut_ptr()), &mut size) {
-            Ok(_) => {}
-            Err(e) => return Err(ChaosError::Other(format!("{}", e))),
-        }
-    };
+    if let Err(e) = unsafe { GetComputerNameW(PWSTR(buffer.as_mut_ptr()), &mut size) } {
+        return Err(ChaosError::Other(e.to_string()));
+    }
     if size == 0 {
         return Err(ChaosError::Unknown);
     }
@@ -25,7 +22,6 @@ pub fn get_hostname() -> ChaosResult<String> {
 
 pub fn get_system_uuid() -> ChaosResult<String> {
     //https://gist.github.com/vadimpiven/618b720324e9f54c01075fcb8675f2c4
-
     let size = unsafe { GetSystemFirmwareTable(RSMB, 0, None) };
     let mut buffer = vec![0; size as usize];
     let writed = unsafe { GetSystemFirmwareTable(RSMB, 0, Some(&mut buffer)) };
@@ -58,5 +54,6 @@ pub fn get_system_uuid() -> ChaosResult<String> {
 
 #[test]
 fn system_uuid_must_be_obtained() {
-    let _ = get_system_uuid();
+    let systemuuid = get_system_uuid().unwrap();
+    assert!(!systemuuid.is_empty());
 }

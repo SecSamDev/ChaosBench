@@ -29,7 +29,7 @@ impl Handler<AgentLog> for UserConnection {
     type Result = ();
 
     fn handle(&mut self, msg: AgentLog, ctx: &mut Self::Context) -> Self::Result {
-        let res = UserActionResponse::Logs(msg.msg);
+        let res = UserActionResponse::Logs(msg.0);
         let bin = serde_json::to_vec(&res).unwrap();
         ctx.binary(bin);
     }

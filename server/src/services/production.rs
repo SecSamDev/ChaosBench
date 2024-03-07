@@ -4,8 +4,7 @@ use crate::repository::memory::MemoryRepository;
 
 use super::ServerServices;
 use actix_files::NamedFile;
-use async_trait::async_trait;
-use chaos_core::{err::{ChaosError, ChaosResult}, scenario::TestScenario, tasks::AgentTask};
+use chaos_core::{common::hash_params_and_actions, err::{ChaosError, ChaosResult}, scenario::TestScenario, tasks::{AgentTask, AgentTaskResult}};
 
 pub struct ProductionService {
     repo : MemoryRepository
@@ -15,7 +14,6 @@ impl ProductionService {
         Self {repo}
     }
 }
-#[async_trait]
 impl ServerServices for ProductionService {
 
     fn backup_db(&self, location : &str) -> ChaosResult<()> {
@@ -24,19 +22,31 @@ impl ServerServices for ProductionService {
         Ok(())
     }
 
-    async fn register_new_agent(&self) {
+    fn register_new_agent(&self) {
         todo!()
     }
-    async fn update_agent_task(&self, task : AgentTask) {
+    fn update_agent_task(&self, task : AgentTask) {
 
     }
 
-    async fn get_next_task_for_agent(&self, agent : &str) -> Option<AgentTask> {
+    fn get_next_task_for_agent(&self, agent : &str) -> Option<AgentTask> {
         None
     }
 
-    async fn upload_artifact(&self, name : &str, location : &str) {
+    fn upload_artifact(&self, name : &str, location : &str) {
 
+    }
+    fn hash_state(&self) -> u64 {
+        let db = self.repo.db.lock().unwrap();
+        let scenario = match &db.scenario {
+            Some(v) => v,
+            None => return u64::MAX
+        };
+        let scenario = match db.scenarios.get(scenario) {
+            Some(v) => v,
+            None => return u64::MAX
+        };
+        hash_params_and_actions(&scenario.parameters, &scenario.actions)
     }
 
     fn agent_log(&self, agent : String, file : String, log : String) {
@@ -95,11 +105,21 @@ impl ServerServices for ProductionService {
         self.repo.scenarios.iter().map(|v| v.name.clone()).collect()
     }
 
-    async fn download_file(&self, filename : &str) -> Option<NamedFile> {
-        log::info!("Downloading file: {}", filename);
-        let file_path = std::env::current_dir().unwrap().join("workspace").join(filename);
+    fn current_scenario(&self) -> ChaosResult<TestScenario> {
+        let db = self.repo.db.lock().unwrap();
+        let scenario = match &db.scenario {
+            Some(v) => v,
+            None => return Err(ChaosError::Unknown)
+        };
+        let scenario = match db.scenarios.get(scenario) {
+            Some(v) => v,
+            None => return Err(ChaosError::Unknown)
+        };
+        Ok(scenario.clone())
+    }
 
-        let file = actix_files::NamedFile::open_async(file_path).await.ok()?;
-        Some(file)
+    fn set_task_as_executed(&self, task : AgentTaskResult) {
+        let mut db = self.repo.db.lock().unwrap();
+        db.set_task(task);
     }
 }

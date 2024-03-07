@@ -8,6 +8,6 @@ edition.workspace = true
 
 [dependencies]
 chaos-core = { "path" = "../common" }
-websocket = {workspace = true}
+tungstenite = {workspace = true}
 serde_json = {workspace = true}
 dialoguer = {version = "0.11", features = ["history", "completion"]}

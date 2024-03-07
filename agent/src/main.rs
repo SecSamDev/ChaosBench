@@ -13,6 +13,5 @@ pub(crate) mod db;
 
 fn main() {
     set_home();
-    init_logging();
     services::run();
 }

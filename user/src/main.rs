@@ -11,57 +11,49 @@ use std::{
 
 use chaos_core::api::user_actions::{CreateScenario, UserAction, UserActionResponse};
 use dialoguer::{BasicHistory, Input, Select};
-use websocket::{
-    sync::Client,
-    ws::{self, Message},
-    OwnedMessage, WebSocketError,
-};
+use tungstenite::{stream::MaybeTlsStream, WebSocket};
 
 const SERVER_ADDRESS: &str = env!("AGENT_SERVER_ADDRESS");
 
 fn main() {
     let route = format!("ws://{}/user/connect", SERVER_ADDRESS);
-    let mut client = websocket::ClientBuilder::new(&route)
-        .unwrap()
-        .connect_insecure()
+    let (mut client, response) = tungstenite::client::connect(&route)
         .unwrap();
-    client.set_nonblocking(true).unwrap();
     println!("Connected to: {}", SERVER_ADDRESS);
     read_commands(client);
 }
 
-fn process_message(client: &mut Client<TcpStream>) -> Result<(), WebSocketError> {
-    let msg = match client.recv_message() {
+fn process_message(client: &mut WebSocket<MaybeTlsStream<TcpStream>>) -> Result<UserActionResponse, tungstenite::Error> {
+    let msg = match client.read() {
         Ok(v) => v,
         Err(e) => match e {
-            WebSocketError::NoDataAvailable => return Ok(()),
-            WebSocketError::IoError(e) => match e.kind() {
-                std::io::ErrorKind::WouldBlock => return Ok(()),
-                _ => return Err(WebSocketError::IoError(e)),
+            tungstenite::Error::Io(e) => match e.kind() {
+                std::io::ErrorKind::WouldBlock => return Ok(UserActionResponse::None),
+                _ => return Err(tungstenite::Error::Io(e)),
             },
             _ => return Err(e),
         },
     };
     let res: UserActionResponse = match msg {
-        OwnedMessage::Text(v) => serde_json::from_str(&v).unwrap_or_default(),
-        OwnedMessage::Binary(v) => serde_json::from_slice(&v).unwrap_or_default(),
-        _ => return Ok(()),
+        tungstenite::Message::Text(v) => serde_json::from_str(&v).unwrap_or_default(),
+        tungstenite::Message::Binary(v) => serde_json::from_slice(&v).unwrap_or_default(),
+        _ => return Ok(UserActionResponse::None),
     };
-    println!("{:?}", res);
-    Ok(())
+    Ok(res)
 }
 
+
 fn send_message(
-    client: &mut Client<TcpStream>,
-    receiver: &Receiver<OwnedMessage>,
-) -> Result<(), WebSocketError> {
+    client: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    receiver: &Receiver<tungstenite::Message>,
+) -> Result<(), tungstenite::Error> {
     if let Ok(msg) = receiver.recv_timeout(std::time::Duration::from_secs_f32(1.0)) {
-        client.send_message(&msg).unwrap();
+        client.send(msg).unwrap();
     }
     Ok(())
 }
 
-fn read_commands(mut client: Client<TcpStream>) {
+fn read_commands(mut client: WebSocket<MaybeTlsStream<TcpStream>>) {
     let commands = [
         "help",
         "create-scenario",
@@ -89,8 +81,9 @@ fn read_commands(mut client: Client<TcpStream>) {
             Some(v) => v,
             None => continue,
         };
-        client.send_message(&msg).unwrap();
-        process_message(&mut client).unwrap();
+        client.send(msg).unwrap();
+        let msg = process_message(&mut client).unwrap();
+        println!("{:?}", msg);
     }
 }
 
@@ -110,8 +103,8 @@ fn print_help() {
 fn to_ws_message(
     command: &str,
     history: &mut BasicHistory,
-    client: &mut Client<TcpStream>,
-) -> Option<OwnedMessage> {
+    client: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+) -> Option<tungstenite::Message> {
     if command == "help" {
         print_help();
         return None;
@@ -150,10 +143,11 @@ fn to_ws_message(
         }
         _ => return None,
     };
-    Some(OwnedMessage::Binary(serde_json::to_vec(&msg).unwrap()))
+    Some(user_action_to_message(&msg))
 }
 
-fn listen_to_logs(client: &mut Client<TcpStream>) {
+fn listen_to_logs(client: &mut WebSocket<MaybeTlsStream<TcpStream>>) {
+    client.send(user_action_to_message(&UserAction::Logs)).unwrap();
     let run = Arc::new(AtomicBool::new(true));
     let thd = std::thread::spawn(|| {
         loop {
@@ -170,7 +164,18 @@ fn listen_to_logs(client: &mut Client<TcpStream>) {
         if !run.load(std::sync::atomic::Ordering::Relaxed) {
             break;
         }
-        process_message(client).unwrap();
+        let msg = process_message(client).unwrap();
+        if let UserActionResponse::Logs(log) = msg {
+            println!("{} - {}", log.agent, log.msg);
+        }else {
+            println!("{:?}", msg);
+        }
     }
     let _ = thd.join();
+    client.send(user_action_to_message(&UserAction::NoLogs)).unwrap();
+}
+
+
+fn user_action_to_message(action : &UserAction) -> tungstenite::Message {
+    tungstenite::Message::Binary(serde_json::to_vec(action).unwrap())
 }

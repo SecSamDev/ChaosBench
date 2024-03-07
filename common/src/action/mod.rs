@@ -13,7 +13,7 @@ pub mod install;
 pub mod names;
 pub mod service;
 
-#[derive(Clone, Debug, Default, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Serialize, PartialEq, Hash)]
 pub enum TestActionType {
     /// Install the application
     Install,
@@ -105,7 +105,7 @@ impl From<&str> for TestActionType {
 }
 
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, Hash)]
 pub struct CustomAction {
     pub name : String,
     pub action : TestActionType,

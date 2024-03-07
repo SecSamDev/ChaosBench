@@ -18,9 +18,7 @@ impl LogServer {
 
     pub fn send_log(&self, log : Log) {
         self.sessions.iter().for_each(|(_id, addr)| {
-            addr.do_send(AgentLog {
-                msg: log.clone(),
-            })
+            addr.do_send(AgentLog(log.clone()))
         });
     }
 
@@ -54,6 +52,6 @@ impl Handler<AgentLog> for LogServer {
     type Result = ();
 
     fn handle(&mut self, msg: AgentLog, _ctx: &mut Self::Context) -> Self::Result {
-        self.send_log(msg.msg);
+        self.send_log(msg.0);
     }
 }

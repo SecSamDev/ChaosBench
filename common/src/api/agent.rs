@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-use crate::tasks::AgentTask;
+use crate::{action::CustomAction, parameters::TestParameters, tasks::{AgentTask, AgentTaskResult}};
 
 use super::Log;
 
@@ -41,4 +41,28 @@ pub struct NextTaskForAgentRes {
 pub struct AgentLogReq {
     pub log : Log,
     pub agent : String
+}
+
+/// Request from agent to server
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub enum AgentRequest {
+    /// Agent uploads a log
+    Log(String),
+    /// Agent asks for the next task. Requires the hash of the parameters + customactions
+    NextTask(u64),
+    /// Agent completes a task
+    CompleteTask(AgentTaskResult),
+    #[default]
+    HeartBeat
+}
+/// Response from server to agent
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub enum AgentResponse {
+    NextTask(AgentTask),
+    CleanTask,
+    CustomActions(Vec<CustomAction>),
+    Parameters(TestParameters),
+    Stop,
+    #[default]
+    Wait
 }

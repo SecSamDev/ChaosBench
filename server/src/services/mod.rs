@@ -1,24 +1,25 @@
 pub mod production;
 use actix_files::NamedFile;
-use async_trait::async_trait;
-use chaos_core::{err::ChaosResult, scenario::TestScenario, tasks::AgentTask};
+use chaos_core::{err::ChaosResult, scenario::TestScenario, tasks::{AgentTask, AgentTaskResult}};
 
-#[async_trait]
 pub trait ServerServices {
 
     fn backup_db(&self, location : &str) -> ChaosResult<()>;
 
     /// Registers a new agent
-    async fn register_new_agent(&self);
+    fn register_new_agent(&self);
+
+    /// Get scenario configuration state
+    fn hash_state(&self) -> u64;
 
     /// Updates an agent task
-    async fn update_agent_task(&self, task : AgentTask);
+    fn update_agent_task(&self, task : AgentTask);
 
     /// Gets the next scenario task for an agent
-    async fn get_next_task_for_agent(&self, agent : &str) -> Option<AgentTask>;
+    fn get_next_task_for_agent(&self, agent : &str) -> Option<AgentTask>;
 
     /// Uploads an agent artifact
-    async fn upload_artifact(&self, name : &str, location : &str);
+    fn upload_artifact(&self, name : &str, location : &str);
 
     /// Uploads an agent log
     fn agent_log(&self, agent : String, file : String, log : String);
@@ -35,6 +36,9 @@ pub trait ServerServices {
     /// Gets a testing scenario: scenario created based on a file
     fn get_testing_scenario(&self, id : &str) -> ChaosResult<TestScenario>;
 
+    /// Gets current testing scenario
+    fn current_scenario(&self) -> ChaosResult<TestScenario>;
+
     /// Gets a scenario from a file
     fn get_scenario(&self, id : &str) -> ChaosResult<TestScenario>;
 
@@ -43,7 +47,6 @@ pub trait ServerServices {
 
     /// List all file scenarios
     fn list_scenarios(&self) -> Vec<String>;
-
-    /// Downloads a file
-    async fn download_file(&self, filename : &str) -> Option<NamedFile>;
+    /// Sets a task as executed
+    fn set_task_as_executed(&self, task : AgentTaskResult);
 }
