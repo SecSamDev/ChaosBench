@@ -18,7 +18,7 @@ async fn connect_agent(
 ) -> impl Responder {
     let ip = req.peer_addr().map(|v| v.ip().to_string()).unwrap_or_default();
     log::info!("Agent connection from ip={}", ip);
-    let connection = ws::start(actors::agent::AgentConnection::new(ip, state.log_server.clone()), &req, stream);
+    let connection = ws::start(actors::agent::AgentConnection::new(ip,state.as_ref().clone()), &req, stream);
     connection
 }
 
@@ -37,10 +37,9 @@ async fn next_task(
     request: Json<NextTaskForAgentReq>,
     state: Data<ServerState>,
 ) -> impl Responder {
+    let task = state.services.get_next_task_for_agent(&request.agent_id).await;
     let res = NextTaskForAgentRes {
-        task : Some(AgentTask {
-            ..Default::default()
-        })
+        task
     };
     HttpResponse::Ok().json(&res)
 }

@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 
-use crate::{domains::tasks::AgentTask, repository::memory::MemoryRepository};
+use crate::repository::memory::MemoryRepository;
 
 use super::ServerServices;
 use actix_files::NamedFile;
 use async_trait::async_trait;
-use chaos_core::{err::{ChaosError, ChaosResult}, scenario::TestScenario};
+use chaos_core::{err::{ChaosError, ChaosResult}, scenario::TestScenario, tasks::AgentTask};
 
 pub struct ProductionService {
     repo : MemoryRepository
@@ -39,7 +39,7 @@ impl ServerServices for ProductionService {
 
     }
 
-    fn agent_log(&self, agent : &str, file : String, log : String) {
+    fn agent_log(&self, agent : String, file : String, log : String) {
         log::info!("{agent} - {file} - {log}");
     }
 

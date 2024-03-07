@@ -9,6 +9,7 @@ pub(crate) mod err;
 pub(crate) mod state;
 pub(crate) mod logging;
 pub(crate) mod sys_info;
+pub(crate) mod db;
 
 fn main() {
     set_home();

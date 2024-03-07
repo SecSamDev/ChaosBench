@@ -1,15 +1,19 @@
+use std::{fs::File, io::Write};
+
 use actix::{
-    fut, Actor, Addr, AsyncContext, Handler, Message as ActixMessage, Recipient, Running, StreamHandler, WrapFuture
+    Actor, Addr, StreamHandler
 };
 use actix_web_actors::ws;
-use chaos_core::api::{agent::AgentLogReq, user_actions::{CreateScenario, UserAction, UserActionResponse}, Log};
+use chaos_core::api::{agent::AgentLogReq, Log};
 
-use crate::{domains::connection::{AgentLog, Connect, Disconnect}, state::ServerState};
+use crate::{domains::connection::AgentLog, state::ServerState};
 
 use super::logs::LogServer;
 pub struct AgentConnection {
     pub(crate) addr: Addr<LogServer>,
     pub(crate) id: String,
+    pub(crate) state : ServerState,
+    pub(crate) log : Option<File>
 }
 
 impl Actor for AgentConnection {
@@ -18,8 +22,9 @@ impl Actor for AgentConnection {
 
 
 impl AgentConnection {
-    pub fn new(id: String, addr: Addr<LogServer>) -> Self {
-        Self { addr, id }
+    pub fn new(id: String, state : ServerState) -> Self {
+        let log = std::fs::File::create(format!("agent-{}.log", id)).ok();
+        Self { addr : state.log_server.clone(), id, state, log }
     }
 }
 
@@ -38,7 +43,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for AgentConnection {
             Some(v) => v,
             None => return,
         };
-        log::info!("{} - {}", data.agent, data.log.msg);
+        if let Some(file) = &mut self.log {
+            let _ = file.write_all(data.log.msg.as_bytes());
+        }
         self.addr.do_send(AgentLog {
             msg : Log {
                 agent : data.log.agent,
@@ -49,35 +56,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for AgentConnection {
     }
 }
 
-fn backup_db(location: String, state: &ServerState) -> Option<UserActionResponse> {
-    let res = state.services.backup_db(&location);
-    Some(UserActionResponse::BackupDB(res))
-}
-fn create_scenario(create: CreateScenario, state: &ServerState) -> Option<UserActionResponse> {
-    let res = state
-        .services
-        .create_testing_scenario(create.id, &create.base_id);
-    Some(UserActionResponse::CreateScenario(res))
-}
-
-fn stop_scenario(scenario: String, state: &ServerState) -> Option<UserActionResponse> {
-    let res = state.services.stop_testing_scenario(scenario);
-    Some(UserActionResponse::StopScenario(res))
-}
-fn start_scenario(scenario: String, state: &ServerState) -> Option<UserActionResponse> {
-    let res = state.services.execute_testing_scenario(scenario);
-    Some(UserActionResponse::StartScenario(res))
-}
-fn list_scenarios(state: &ServerState) -> Option<UserActionResponse> {
-    let scenarios = state.services.list_scenarios();
-    Some(UserActionResponse::EnumerateScenarios(scenarios))
-}
-fn list_testing_scenarios(state: &ServerState) -> Option<UserActionResponse> {
-    let scenarios = state.services.list_testing_scenarios();
-    Some(UserActionResponse::EnumerateTestingScenarios(scenarios))
-}
-
 fn process_agent_message(msg: &[u8]) -> Option<AgentLogReq> {
-    log::info!("{}", String::from_utf8_lossy(msg));
     Some(serde_json::from_slice(msg).ok()?)
 }

@@ -1,9 +1,7 @@
 pub mod production;
 use actix_files::NamedFile;
 use async_trait::async_trait;
-use chaos_core::{err::ChaosResult, scenario::TestScenario};
-
-use crate::domains::tasks::AgentTask;
+use chaos_core::{err::ChaosResult, scenario::TestScenario, tasks::AgentTask};
 
 #[async_trait]
 pub trait ServerServices {
@@ -23,7 +21,7 @@ pub trait ServerServices {
     async fn upload_artifact(&self, name : &str, location : &str);
 
     /// Uploads an agent log
-    fn agent_log(&self, agent : &str, file : String, log : String);
+    fn agent_log(&self, agent : String, file : String, log : String);
 
     /// Queues a scenario for testing
     fn execute_testing_scenario(&self, id : String) -> ChaosResult<()>;

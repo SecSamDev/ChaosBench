@@ -1,8 +1,8 @@
-use actix::{Actor, Addr, AsyncContext, Message as ActixMessage, Recipient, StreamHandler};
+use actix::{Actor, Addr, AsyncContext, Handler, Message as ActixMessage, Recipient, StreamHandler};
 use actix_web_actors::ws;
 use chaos_core::api::user_actions::{CreateScenario, UserAction, UserActionResponse};
 
-use crate::state::ServerState;
+use crate::{domains::connection::{AgentLog, Connect, Disconnect}, state::ServerState};
 
 use super::logs::LogServer;
 pub struct UserConnection {
@@ -25,13 +25,24 @@ impl Actor for UserConnection {
     type Context = ws::WebsocketContext<Self>;
 }
 
+impl Handler<AgentLog> for UserConnection {
+    type Result = ();
+
+    fn handle(&mut self, msg: AgentLog, ctx: &mut Self::Context) -> Self::Result {
+        let res = UserActionResponse::Logs(msg.msg);
+        let bin = serde_json::to_vec(&res).unwrap();
+        ctx.binary(bin);
+    }
+}
+
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for UserConnection {
-    fn started(&mut self, ctx: &mut Self::Context) {
-        let ad = ctx.address();
+    fn finished(&mut self, _ctx: &mut Self::Context) {
+        self.addr.do_send(Disconnect {
+            id : self.id.clone()
+        });
     }
 
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
-        log::info!("Msg received from user");
         let data = match &msg {
             Ok(ws::Message::Text(text)) => process_user_message(text.as_bytes()),
             Ok(ws::Message::Binary(bin)) => process_user_message(bin),
@@ -47,6 +58,14 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for UserConnection {
         log::info!("Received action: {:?}", data);
 
         let res = match data {
+            UserAction::Logs => {
+                let addr = ctx.address();
+                self.addr.do_send(Connect {
+                    addr : addr.recipient(),
+                    id :self.id.clone()
+                });
+                return
+            },
             UserAction::BackupDB(v) => backup_db(v, &self.state),
             UserAction::StartScenario(v) => start_scenario(v, &self.state),
             UserAction::StopScenario(v) => stop_scenario(v, &self.state),
