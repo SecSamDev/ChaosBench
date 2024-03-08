@@ -1,12 +1,13 @@
 use std::{fmt, hash::{Hash, Hasher}, time::Duration};
 
-use serde::{de::{Unexpected, Visitor}, Deserialize, Deserializer, Serializer};
+use serde::{de::Visitor, Deserialize, Deserializer, Serializer};
 
-use crate::{action::CustomAction, parameters::TestParameters};
+use crate::{action::CustomAction, parameters::ScenarioParameters, variables::ScenarioVariables};
 
-pub fn hash_params_and_actions(params : &TestParameters, actions : &[CustomAction]) -> u64 {
+pub fn hash_params_and_actions(params : &ScenarioParameters, actions : &[CustomAction], variables : &ScenarioVariables) -> u64 {
     let mut state = std::collections::hash_map::DefaultHasher::new();
     params.hash(&mut state);
+    variables.hash(&mut state);
     for action in actions {
         action.hash(&mut state);
     }

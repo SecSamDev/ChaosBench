@@ -5,7 +5,7 @@ use serde::{
     Deserialize, Deserializer, Serialize,
 };
 
-use crate::{parameters::{TestParameters, TestParameter}, err::ChaosResult};
+use crate::{err::ChaosResult, parameters::{ScenarioParameters, TestParameter, TestParameters}};
 
 use self::names::TASK_TIMEOUT;
 
@@ -137,7 +137,7 @@ impl From<&str> for TestActionType {
 pub struct CustomAction {
     pub name : String,
     pub action : TestActionType,
-    pub parameters : TestParameters
+    pub parameters : ScenarioParameters
 }
 
 

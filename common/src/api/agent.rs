@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-use crate::{action::CustomAction, parameters::TestParameters, tasks::{AgentTask, AgentTaskResult}, variables::TestVariables};
+use crate::{action::CustomAction, parameters::{ScenarioParameters, TestParameters}, tasks::{AgentTask, AgentTaskResult}, variables::{ScenarioVariables, TestVariables}};
 
 use super::Log;
 
@@ -61,8 +61,8 @@ pub enum AgentResponse {
     NextTask(AgentTask),
     CleanTask,
     CustomActions(Vec<CustomAction>),
-    Parameters(TestParameters),
-    Variables(TestVariables),
+    Parameters(ScenarioParameters),
+    Variables(ScenarioVariables),
     Stop,
     #[default]
     Wait

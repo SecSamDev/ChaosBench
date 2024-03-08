@@ -58,7 +58,7 @@ impl ServerServices for ProductionService {
             Some(v) => v,
             None => return u64::MAX
         };
-        hash_params_and_actions(&scenario.parameters, &scenario.actions)
+        hash_params_and_actions(&scenario.parameters, &scenario.actions, &scenario.variables)
     }
 
     fn agent_log(&self, agent : String, file : String, log : String) {

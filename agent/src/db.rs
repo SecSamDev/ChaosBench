@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use chaos_core::{action::CustomAction, parameters::TestParameters, tasks::AgentTask};
+use chaos_core::{action::CustomAction, parameters::{ScenarioParameters, TestParameters}, tasks::AgentTask, variables::{ScenarioVariables, TestVariables}};
 use serde::{Deserialize, Serialize};
 
 use crate::common::AgentTaskInternal;
@@ -8,8 +8,10 @@ use crate::common::AgentTaskInternal;
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Database {
     pub current_task : Option<AgentTaskInternal>,
-    pub parameters : TestParameters,
-    pub commands : Vec<CustomAction>
+    pub parameters : ScenarioParameters,
+    pub commands : Vec<CustomAction>,
+    pub g_variables : ScenarioVariables,
+    pub variables : TestVariables
 }
 
 impl Database {
@@ -40,11 +42,21 @@ impl Database {
             start : 0
         });
     }
-    pub fn set_global_parameters(&mut self, params : TestParameters) {
+    pub fn set_global_parameters(&mut self, params : ScenarioParameters) {
         self.parameters = params;
     }
-    pub fn get_global_parameters(&self) -> &TestParameters {
+    pub fn get_global_parameters(&self) -> &ScenarioParameters {
         &self.parameters
+    }
+    pub fn set_global_variables(&mut self, params : ScenarioVariables) {
+        self.variables = (&params).into();
+        self.g_variables = params;
+    }
+    pub fn get_global_variables(&self) -> &ScenarioVariables {
+        &self.g_variables
+    }
+    pub fn get_variables(&self) -> &TestVariables {
+        &self.variables
     }
     pub fn set_commands(&mut self, commands: Vec<CustomAction>) {
         self.commands = commands;

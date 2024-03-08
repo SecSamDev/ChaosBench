@@ -62,7 +62,7 @@ impl AgentState {
         let _ = self.stopper.send(signal);
     }
     pub fn state_hash(&self) -> u64 {
-        hash_params_and_actions(&self.db.parameters, &self.db.commands)
+        hash_params_and_actions(&self.db.parameters, &self.db.commands, &self.db.g_variables)
     }
     
 }

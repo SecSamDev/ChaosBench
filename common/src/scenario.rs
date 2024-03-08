@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use serde::{Serialize, Deserialize, Deserializer};
 
-use crate::{phase::TestPhase, parameters::TestParameters, variables::TestVariables, common::*, action::{TestActionType, CustomAction}};
+use crate::{action::{CustomAction, TestActionType}, common::*, parameters::{ScenarioParameters, TestParameters}, phase::TestPhase, variables::{ScenarioVariables, TestVariables}};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct TestScene {
@@ -24,9 +24,9 @@ pub struct TestScenario {
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub description : String,
     /// Variables to auto replace text when parsing a scenario file
-    pub variables : TestVariables,
+    pub variables : ScenarioVariables,
     /// Execution parameters
-    pub parameters : TestParameters,
+    pub parameters : ScenarioParameters,
     /// List of scenes
     pub scenes : Vec<TestScene>,
     /// Custom actions with parameter overriding

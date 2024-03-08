@@ -174,8 +174,8 @@ fn read_messages(state : &mut AgentState, client : &mut WsClient) -> Result<(), 
             AgentResponse::Stop => {
                 state.signal_shutdown(StopCommand::Stop);
             },
-            AgentResponse::Variables(_) => {
-    
+            AgentResponse::Variables(v) => {
+                state.db.set_global_variables(v);
             },
             AgentResponse::Wait => {
                 log::info!("No task to execute. Waiting...");

@@ -39,7 +39,7 @@ pub struct AgentSceneState {
 impl Database {
     pub fn load() -> Database {
         let content = std::fs::read_to_string("./database.db").unwrap_or_default();
-        let database : Database = serde_json::from_str(&content).unwrap_or_default();
+        let database : Database = serde_json::from_str(&content).unwrap();
         log::info!("Loaded database with scenarios={} and executing={}", database.scenarios.len(), database.scenario.as_ref().map(|v| v.name.clone()).unwrap_or_default());
         database
     }

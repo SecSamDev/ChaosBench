@@ -6,49 +6,54 @@ parameters:
     - "arch:x86"
     - "arch:x64"
     - "name!:.*Debug.*"
-  user_name: CNCMS\TestUser # Usuario necesario para iniciar sesión interactiva de usuario
-  user_password: TestUser123$ # Contraseña del usuario de pruebas
+  windows:
+    user_name: CNCMS\TestUser # Usuario necesario para iniciar sesión interactiva de usuario
+    user_password: TestUser123$ # Contraseña del usuario de pruebas
 
-  # Si la app tiene un servicio queremos saber el nombre o nombres. Usado por StartAppService que es un alias de StartService $name
-  service_name: superprogram 
+    # Si la app tiene un servicio queremos saber el nombre o nombres. Usado por StartAppService que es un alias de StartService $name
+    service_name: superprogram 
 
-  install_parameters:
-    SERVER: 10.0.0.2:443
-    API_KEY: 12345
-  # Para pruebas de parámetros erróneos
-  install_error_parameters:
-    SERVER: not_a_hostname:123:123
-    API_KEY: null
-  # (Opcional) Todo lo de después de /i xxx.msi /qn ..
-  install_command: /lv install_log.txt SERVER=10.0.0.2 API_KEY=12345 
-  # Custom command para desinstalar
-  uninstall_command: ... 
-  # Custom parameters para desinstalar
-  uninstall_parameters:
-    force: true
-  # Informar sobre los ficheros que utiliza nuestra aplicación para facilitar limpieza
-  application_folders:
-    - C:\Program Files\program
-    - C:\ProgramData\program
-    - "%APPDATA%\\Temp\\program"
-  # https://serverfault.com/questions/813506/setting-environment-variable-for-service
-  service_env_vars: # Variables de entorno extra que se inyectarán en el servicio de la aplicación
-    # Estas siguientes las hará sola la aplicación para poder guardar artefactos que genere la app a testear
-    TEMP: C:\ProgramData\chaos\app_temp
-    TMP: C:\ProgramData\chaos\app_temp
-  user_env_vars: # Variables de entorno extra para la sesión de usuario
-    TEMP: C:\ProgramData\chaos\user_temp
-    TMP: C:\ProgramData\chaos\user_temp
+    install_parameters:
+      SERVER: 10.0.0.2:443
+      API_KEY: 12345
+    # Para pruebas de parámetros erróneos
+    install_error_parameters:
+      SERVER: not_a_hostname:123:123
+      API_KEY: null
+    # (Opcional) Todo lo de después de /i xxx.msi /qn ..
+    install_command: /lv install_log.txt SERVER=10.0.0.2 API_KEY=12345 
+    # Custom command para desinstalar
+    uninstall_command: ... 
+    # Custom parameters para desinstalar
+    uninstall_parameters:
+      force: true
+    # Informar sobre los ficheros que utiliza nuestra aplicación para facilitar limpieza
+    application_folders:
+      - C:\Program Files\program
+      - C:\ProgramData\program
+      - "%APPDATA%\\Temp\\program"
+    # https://serverfault.com/questions/813506/setting-environment-variable-for-service
+    service_env_vars: # Variables de entorno extra que se inyectarán en el servicio de la aplicación
+      # Estas siguientes las hará sola la aplicación para poder guardar artefactos que genere la app a testear
+      TEMP: C:\ProgramData\chaos\app_temp
+      TMP: C:\ProgramData\chaos\app_temp
+    user_env_vars: # Variables de entorno extra para la sesión de usuario
+      TEMP: C:\ProgramData\chaos\user_temp
+      TMP: C:\ProgramData\chaos\user_temp
+  linux:
+    install_command: $SERVER=10.0.0.2 $API_KEY=12345 
 
 variables:
-  application_folder: C:\Program Files\program
+  windows:
+    application_folder: C:\Program Files\program
 files:
   - "Superprogram file.exe"
 actions:
   - name: UninstallWithUninstaller
     action: Execute
     parameters:
-      command: "$application_folder\\uninstaller.exe --force"
+      windows:
+        command: "${application_folder}\\uninstaller.exe --force"
 
 scenario:
   cleanup:

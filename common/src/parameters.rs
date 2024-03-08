@@ -6,31 +6,61 @@ use serde::{
     ser::{SerializeSeq, SerializeMap}
 };
 
-use crate::common::string_to_duration;
+use crate::{common::{deserialize_null_default, string_to_duration}, variables::TestVariables};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, Hash)]
-pub struct TestParameters {
+pub struct ScenarioParameters {
     #[serde(flatten)]
-    pub(crate) parameters: BTreeMap<String, TestParameter>,
+    pub global : TestParameters,
+    #[serde(default, deserialize_with="deserialize_null_default")]
+    pub windows : TestParameters,
+    #[serde(default, deserialize_with="deserialize_null_default")]
+    pub linux : TestParameters
 }
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, Hash)]
+#[serde(transparent)]
+pub struct TestParameters(pub BTreeMap<String, TestParameter>);
+
 
 impl TestParameters {
     pub fn new() -> Self {
-        Self {
-            parameters: BTreeMap::new(),
-        }
+        Self::default()
     }
     pub fn inner(&self) -> &BTreeMap<String, TestParameter> {
-        &self.parameters
+        &self.0
     }
     pub fn get(&self, name: &str) -> Option<&TestParameter> {
-        self.parameters.get(name)
+        self.0.get(name)
     }
     pub fn insert(&mut self, name: &str, value: TestParameter) {
-        self.parameters.insert(name.into(), value);
+        self.0.insert(name.into(), value);
     }
     pub fn contains_key(&self, name: &str) -> bool {
-        self.parameters.contains_key(name)
+        self.0.contains_key(name)
+    }
+    pub fn replace_with_vars(&mut self, vars : &TestVariables) {
+        for (_, v) in self.0.iter_mut() {
+            v.replace_with_vars(vars);
+        }
+    }
+}
+
+impl From<&ScenarioParameters> for TestParameters {
+    fn from(value: &ScenarioParameters) -> Self {
+        let mut params = Self::new();
+        for (k, v) in &value.global.0 {
+            params.insert(k, v.clone());
+        }
+        #[cfg(target_os="windows")]
+        for (k, v) in &value.windows.0 {
+            params.insert(k, v.clone());
+        }
+        #[cfg(target_os="linux")]
+        for (k, v) in &value.linux.0 {
+            params.insert(k, v.clone());
+        }
+        params
     }
 }
 
@@ -311,4 +341,62 @@ impl Serialize for TestParameter {
             TestParameter::Null => serializer.serialize_none(),
         }
     }
+}
+
+impl TestParameter {
+    pub fn replace_with_vars(&mut self, vars : &TestVariables) {
+        match self {
+            TestParameter::Text(v) => interpolate_text(v, vars),
+            TestParameter::Obj(obj) => {
+                for (_, p) in obj {
+                    p.replace_with_vars(vars);
+                }
+            },
+            TestParameter::Vec(v) => {
+                for p in v {
+                    p.replace_with_vars(vars);
+                }
+            },
+            _ => return
+        }
+    }
+}
+
+pub fn interpolate_text(template : &mut String, vars : &TestVariables) {
+    loop {
+        let (start, end, variable) = match get_next_variable_position(template) {
+            Some(v) => v,
+            None => break
+        };
+        let value = match vars.0.get(variable) {
+            Some(v) => v,
+            None => break
+        };
+        let txt : &str = match value.try_into() {
+            Ok(v) => v,
+            Err(_) => break
+        };
+        let start_part = if start == 0 { "" } else { &template[0..start] };
+        let end_part = if end - start == 0 { "" } else { &template[end..] };
+        *template = format!("{}{}{}", start_part, txt, end_part);
+        println!("{}", template);
+    }
+}
+
+fn get_next_variable_position(template : &str) -> Option<(usize, usize, &str)> {
+    let position = template.find("${")?;
+    let end_position = template[position + 2..].find('}')? + position + 2;
+    let var = &template[position + 2..end_position];
+    Some((position, end_position + 1, var))
+}
+
+#[test]
+fn should_interpolate_parameters() {
+    let file_content = std::fs::read_to_string("./src/basic_scenario.yaml").unwrap();
+    let basic_scene : crate::scenario::TestScenario = serde_yaml::from_str(&file_content).unwrap();
+    let mut parameters : TestParameters = (&basic_scene.actions.get(0).unwrap().parameters).into();
+    let variables: TestVariables  = (&basic_scene.variables).into();
+    parameters.replace_with_vars(&variables);
+    let command : &str = parameters.get("command").unwrap().try_into().unwrap();
+    assert_eq!("C:\\Program Files\\program\\uninstaller.exe --force", command);
 }

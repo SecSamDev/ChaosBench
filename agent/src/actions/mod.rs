@@ -12,14 +12,15 @@ pub mod workspace;
 pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, task : &mut AgentTaskInternal) -> ChaosResult<()> {
     let global_parameters = state.db.get_global_parameters();
     let commands = state.db.get_commands();
-    let mut parameters = global_parameters.clone();
+    let mut parameters: TestParameters = global_parameters.into();
     let mut action = origin_action.clone();
     if let TestActionType::Custom(ca) = origin_action {
         for command in commands {
             if command.name == ca {
                 action = command.action.to_owned();
                 // Override parameters with the ones from custom action
-                for (name, value) in command.parameters.inner() {
+                let cmd_params : TestParameters = (&command.parameters).into();
+                for (name, value) in cmd_params.inner() {
                     parameters.insert(name, value.clone());
                 }
                 break
@@ -29,6 +30,7 @@ pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, t
             return Err(ChaosError::Other(format!("Custom action {} not found", ca)))
         }
     }
+    parameters.replace_with_vars(state.db.get_variables());
     let res = match &action {
         TestActionType::Install => installation::execute_install(&parameters),
         TestActionType::Uninstall => installation::execute_uninstall(&parameters),

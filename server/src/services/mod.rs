@@ -1,5 +1,4 @@
 pub mod production;
-use actix_files::NamedFile;
 use chaos_core::{err::ChaosResult, scenario::TestScenario, tasks::{AgentTask, AgentTaskResult}};
 
 pub trait ServerServices {
