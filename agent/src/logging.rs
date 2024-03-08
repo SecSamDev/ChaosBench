@@ -105,7 +105,7 @@ impl Write for ApiWriterLock {
         // TODO: Tener en cuenta que el canal esté lleno...
         // NOTA: Las llamadas a este método son por cada parte del pattern, no una linea entera
         let ln = msg.len();
-        let _ = self.writer.send(msg);
+        let _ = self.writer.try_send(msg);
         Ok(ln)
     }
 

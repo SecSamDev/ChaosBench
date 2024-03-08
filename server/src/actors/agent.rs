@@ -23,7 +23,7 @@ impl Actor for AgentConnection {
 
 impl AgentConnection {
     pub fn new(id: String, state : ServerState) -> Self {
-        let log = std::fs::File::create(format!("agent-{}.log", id)).ok();
+        let log = std::fs::File::options().append(true).write(true).truncate(false).open(format!("agent-{}.log", id)).ok();
         Self { addr : state.log_server.clone(), id, state, log }
     }
     fn write_log_to_file(&mut self, log : &str) {
@@ -61,7 +61,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for AgentConnection {
             },
             AgentRequest::HeartBeat => {},
             AgentRequest::NextTask(hash) => {
+                
                 let actual_hash = self.state.services.hash_state();
+                log::info!("Asking for task: {}vs{}", hash, actual_hash);
                 let scenario = match self.state.services.current_scenario() {
                     Ok(v) => v,
                     Err(_) => return
@@ -71,11 +73,17 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for AgentConnection {
                     ctx.binary(bin);
                     let bin = serde_json::to_vec(&AgentResponse::CustomActions(scenario.actions)).unwrap();
                     ctx.binary(bin);
+                    let bin = serde_json::to_vec(&AgentResponse::Variables(scenario.variables)).unwrap();
+                    ctx.binary(bin);
                     return
                 }
                 let task = match self.state.services.get_next_task_for_agent(&self.id) {
                     Some(v) => v,
-                    None => return
+                    None => {
+                        let bin = serde_json::to_vec(&AgentResponse::Wait).unwrap();
+                        ctx.binary(bin);
+                        return
+                    } 
                 };
                 let bin = serde_json::to_vec(&AgentResponse::NextTask(task)).unwrap();
                 ctx.binary(bin);

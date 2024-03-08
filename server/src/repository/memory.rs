@@ -3,6 +3,8 @@ use std::{collections::{BTreeMap, BTreeSet}, sync::{Arc, Mutex}};
 use chaos_core::{scenario::TestScenario, tasks::{AgentTask, AgentTaskResult}};
 use serde::{Deserialize, Serialize};
 
+use crate::domains::scenario::CalculatedScenario;
+
 #[derive(Clone)]
 pub struct MemoryRepository {
     pub db : Arc<Mutex<Database>>,
@@ -22,7 +24,7 @@ impl MemoryRepository {
 pub struct Database {
     pub agents : BTreeSet<String>,
     /// Actual scenario in execution
-    pub scenario : Option<String>,
+    pub scenario : Option<CalculatedScenario>,
     pub scenarios : BTreeMap<String, TestScenario>,
     /// Resultado de la ejecución en cada equipo y de cada fase del escenario actual
     pub state : BTreeMap<String, AgentSceneState>
@@ -38,6 +40,7 @@ impl Database {
     pub fn load() -> Database {
         let content = std::fs::read_to_string("./database.db").unwrap_or_default();
         let database : Database = serde_json::from_str(&content).unwrap_or_default();
+        log::info!("Loaded database with scenarios={} and executing={}", database.scenarios.len(), database.scenario.as_ref().map(|v| v.name.clone()).unwrap_or_default());
         database
     }
     pub fn save(&self) {
@@ -51,7 +54,7 @@ impl Database {
     }
 
     pub fn set_task(&mut self, task : AgentTaskResult) {
-        let mut entry = self.state.entry(task.agent.clone()).or_insert(AgentSceneState::default());
+        let entry = self.state.entry(task.agent.clone()).or_insert(AgentSceneState::default());
         entry.last_task = Some(task.id);
         entry.results.insert(task.id, task);
     }

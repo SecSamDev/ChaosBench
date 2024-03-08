@@ -30,7 +30,19 @@ impl ServerServices for ProductionService {
     }
 
     fn get_next_task_for_agent(&self, agent : &str) -> Option<AgentTask> {
-        None
+        let mut db = self.repo.db.lock().unwrap();
+        db.agents.insert(agent.to_string());
+        let scenario = db.scenario.as_ref()?;
+        let next_task = match db.state.get(agent) {
+            Some(v) => match v.last_task {
+                Some(v) => v + 1,
+                None => 0
+            },
+            None => 0
+        };
+        let mut task = scenario.tasks.get(next_task as usize).map(|v| v.clone())?;
+        task.agent = agent.to_string();
+        Some(task)
     }
 
     fn upload_artifact(&self, name : &str, location : &str) {
@@ -42,7 +54,7 @@ impl ServerServices for ProductionService {
             Some(v) => v,
             None => return u64::MAX
         };
-        let scenario = match db.scenarios.get(scenario) {
+        let scenario = match db.scenarios.get(&scenario.name) {
             Some(v) => v,
             None => return u64::MAX
         };
@@ -56,10 +68,11 @@ impl ServerServices for ProductionService {
     fn execute_testing_scenario(&self, scenario : String) -> ChaosResult<()> {
         let mut db = self.repo.db.lock().unwrap();
         match &db.scenario {
-            Some(v) => return Err(ChaosError::Other(format!("There is alredy a scenario in execution: {}", v))),
+            Some(v) => return Err(ChaosError::Other(format!("There is alredy a scenario in execution: {}", v.name))),
             None => {}
         };
-        db.scenario = Some(scenario);
+        let scenario = db.scenarios.get(&scenario).ok_or(ChaosError::Unknown)?;
+        db.scenario = Some(scenario.into());
         Ok(())
     }
 
@@ -111,7 +124,7 @@ impl ServerServices for ProductionService {
             Some(v) => v,
             None => return Err(ChaosError::Unknown)
         };
-        let scenario = match db.scenarios.get(scenario) {
+        let scenario = match db.scenarios.get(&scenario.name) {
             Some(v) => v,
             None => return Err(ChaosError::Unknown)
         };
@@ -119,6 +132,7 @@ impl ServerServices for ProductionService {
     }
 
     fn set_task_as_executed(&self, task : AgentTaskResult) {
+        log::info!("Task completed: {}-{}", task.agent, task.id);
         let mut db = self.repo.db.lock().unwrap();
         db.set_task(task);
     }

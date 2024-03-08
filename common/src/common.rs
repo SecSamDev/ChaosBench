@@ -1,6 +1,6 @@
 use std::{fmt, hash::{Hash, Hasher}, time::Duration};
 
-use serde::{Deserializer, Deserialize, de::{Visitor, Unexpected}};
+use serde::{de::{Unexpected, Visitor}, Deserialize, Deserializer, Serializer};
 
 use crate::{action::CustomAction, parameters::TestParameters};
 
@@ -34,6 +34,13 @@ pub fn deserialize_duration<'de, D>(d: D) -> Result<Duration, D::Error>
         Ok(v) => Ok(v),
         Err(_) => Ok(default_timeout())
     }
+}
+
+pub fn serialize_duration<S>(v: &Duration, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&format!("{}s", v.as_secs()))
 }
 
 struct StrDurationVisitor;

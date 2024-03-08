@@ -46,7 +46,6 @@ impl AgentState {
         let slog = self.log.as_mut()?;
         slog.push_str(&log);
         if slog.contains("\n") {
-            drop(slog);
             let mut tk = None;
             std::mem::swap(&mut self.log, &mut tk);
             return tk;

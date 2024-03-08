@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, fmt, time::Duration};
 use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize,
+    ser::{SerializeSeq, SerializeMap}
 };
 
 use crate::common::string_to_duration;
@@ -33,7 +34,7 @@ impl TestParameters {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default)]
 pub enum TestParameter {
     Text(String),
     Bool(bool),
@@ -124,47 +125,53 @@ impl<'de> Visitor<'de> for TestParameterVisitor {
         Ok(TestParameter::Bool(v))
     }
     fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
-        where
-            E: de::Error, {
-                Ok(TestParameter::Text(v.to_string()))
+    where
+        E: de::Error,
+    {
+        Ok(TestParameter::Text(v.to_string()))
     }
     fn visit_f32<E>(self, v: f32) -> Result<Self::Value, E>
-        where
-            E: de::Error, {
+    where
+        E: de::Error,
+    {
         Ok(TestParameter::F64(v.into()))
     }
     fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
-        where
-            E: de::Error, {
+    where
+        E: de::Error,
+    {
         Ok(TestParameter::F64(v.into()))
     }
 
     fn visit_none<E>(self) -> Result<Self::Value, E>
-        where
-            E: de::Error, {
+    where
+        E: de::Error,
+    {
         Ok(TestParameter::Null)
     }
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-        where
-            A: de::SeqAccess<'de>, {
+    where
+        A: de::SeqAccess<'de>,
+    {
         let mut vc = Vec::with_capacity(seq.size_hint().unwrap_or(32));
         loop {
-            let element : TestParameter = match seq.next_element() {
+            let element: TestParameter = match seq.next_element() {
                 Ok(Some(v)) => v,
-                _ => break
+                _ => break,
             };
             vc.push(element);
         }
         Ok(TestParameter::Vec(vc))
     }
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-        where
-            A: de::MapAccess<'de>, {
+    where
+        A: de::MapAccess<'de>,
+    {
         let mut obj = BTreeMap::new();
         loop {
-            let (key, value) : (String, TestParameter) = match map.next_entry() {
+            let (key, value): (String, TestParameter) = match map.next_entry() {
                 Ok(Some(v)) => v,
-                _ => break
+                _ => break,
             };
             obj.insert(key, value);
         }
@@ -183,7 +190,7 @@ impl<'de> Deserialize<'de> for TestParameter {
 
 impl TryFrom<&TestParameter> for String {
     type Error = &'static str;
-    fn try_from(value: &TestParameter) -> Result<Self,Self::Error> {
+    fn try_from(value: &TestParameter) -> Result<Self, Self::Error> {
         Ok(match value {
             TestParameter::Text(v) => v.into(),
             TestParameter::Bool(v) => v.to_string(),
@@ -192,60 +199,60 @@ impl TryFrom<&TestParameter> for String {
             TestParameter::F64(v) => v.to_string(),
             TestParameter::Obj(_) => return Err("Cannot convert from obj to string"),
             TestParameter::Vec(_) => return Err("Cannot convert from vec to string"),
-            TestParameter::Null => "".into()
+            TestParameter::Null => "".into(),
         })
     }
 }
 
 impl<'a> TryFrom<&'a TestParameter> for &'a str {
     type Error = &'static str;
-    fn try_from(value: &'a TestParameter) -> Result<Self,Self::Error> {
+    fn try_from(value: &'a TestParameter) -> Result<Self, Self::Error> {
         match value {
             TestParameter::Text(v) => return Ok(v.as_str()),
             TestParameter::Null => return Ok(""),
-            _ => Err("Cannot convert to &str")
+            _ => Err("Cannot convert to &str"),
         }
     }
 }
 impl<'a> TryFrom<&'a TestParameter> for &'a BTreeMap<String, TestParameter> {
     type Error = &'static str;
-    fn try_from(value: &'a TestParameter) -> Result<Self,Self::Error> {
+    fn try_from(value: &'a TestParameter) -> Result<Self, Self::Error> {
         match value {
             TestParameter::Obj(v) => Ok(v),
-            _ => Err("Cannot convert to Map")
+            _ => Err("Cannot convert to Map"),
         }
     }
 }
 
 impl TryFrom<&TestParameter> for i32 {
     type Error = &'static str;
-    fn try_from(value: &TestParameter) -> Result<Self,Self::Error> {
+    fn try_from(value: &TestParameter) -> Result<Self, Self::Error> {
         Ok(match value {
             TestParameter::U64(v) => *v as i32,
             TestParameter::I64(v) => *v as i32,
-            _ => return Err("Invalid numeric value")
+            _ => return Err("Invalid numeric value"),
         })
     }
 }
 impl TryFrom<TestParameter> for i32 {
     type Error = &'static str;
-    fn try_from(value: TestParameter) -> Result<Self,Self::Error> {
+    fn try_from(value: TestParameter) -> Result<Self, Self::Error> {
         Ok(match value {
             TestParameter::U64(v) => v as i32,
             TestParameter::I64(v) => v as i32,
-            _ => return Err("Invalid numeric value")
+            _ => return Err("Invalid numeric value"),
         })
     }
 }
 
 impl TryFrom<&TestParameter> for Duration {
     type Error = &'static str;
-    fn try_from(value: &TestParameter) -> Result<Self,Self::Error> {
+    fn try_from(value: &TestParameter) -> Result<Self, Self::Error> {
         Ok(match value {
             TestParameter::U64(v) => Duration::from_secs(*v),
             TestParameter::I64(v) => Duration::from_secs(*v as u64),
             TestParameter::Text(v) => string_to_duration(v).ok_or("Invalid duration string")?,
-            _ => return Err("Invalid duration value")
+            _ => return Err("Invalid duration value"),
         })
     }
 }
@@ -261,7 +268,7 @@ impl std::hash::Hash for TestParameter {
                 state.write(&v.to_le_bytes());
             }
             TestParameter::Obj(map) => {
-                for (k,v) in map {
+                for (k, v) in map {
                     state.write(k.as_bytes());
                     v.hash(state);
                 }
@@ -271,7 +278,37 @@ impl std::hash::Hash for TestParameter {
                     param.hash(state);
                 }
             }
-            TestParameter::Null => state.write_u8(0)
+            TestParameter::Null => state.write_u8(0),
+        }
+    }
+}
+
+impl Serialize for TestParameter {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            TestParameter::Text(v) => serializer.serialize_str(v),
+            TestParameter::Bool(v) => serializer.serialize_bool(*v),
+            TestParameter::U64(v) => serializer.serialize_u64(*v),
+            TestParameter::I64(v) => serializer.serialize_i64(*v),
+            TestParameter::F64(v) => serializer.serialize_f64(*v),
+            TestParameter::Obj(m) => {
+                let mut map = serializer.serialize_map(Some(m.len()))?;
+                for (k, v) in m {
+                    map.serialize_entry(k, v)?;
+                }
+                map.end()
+            },
+            TestParameter::Vec(v) => {
+                let mut seq = serializer.serialize_seq(Some(v.len()))?;
+                for element in v {
+                    seq.serialize_element(element)?;
+                }
+                seq.end()
+            },
+            TestParameter::Null => serializer.serialize_none(),
         }
     }
 }

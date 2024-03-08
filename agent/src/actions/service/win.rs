@@ -4,7 +4,7 @@ use chaos_core::{action::service::ServiceCommand, parameters::TestParameters, er
 use windows::{Win32::{System::Services::{OpenServiceW, OpenSCManagerW, SC_MANAGER_CONNECT, SC_MANAGER_ENUMERATE_SERVICE, SERVICE_INTERROGATE, SERVICE_CONTROL_STOP, CloseServiceHandle, ControlService, SERVICE_STATUS, StartServiceW, SERVICE_START, QueryServiceStatus, SERVICE_STOPPED, SERVICE_START_PENDING}, Security::SC_HANDLE}, core::PCWSTR};
 
 pub fn stop_service(parameters: &TestParameters) -> ChaosResult<()> {
-    let parameters: ServiceCommand = parameters.try_into().unwrap();
+    let parameters: ServiceCommand = parameters.try_into()?;
     stop_service_internal(&parameters)
 }
 
@@ -13,7 +13,7 @@ fn stop_service_internal(parameters : &ServiceCommand) -> ChaosResult<()> {
 }
 
 pub fn start_service(parameters: &TestParameters) -> ChaosResult<()> {
-    let parameters: ServiceCommand = parameters.try_into().unwrap();
+    let parameters: ServiceCommand = parameters.try_into()?;
     start_service_internal(&parameters)
 }
 fn start_service_internal(parameters: &ServiceCommand) -> ChaosResult<()> {
@@ -34,7 +34,7 @@ fn start_service_internal(parameters: &ServiceCommand) -> ChaosResult<()> {
 }
 
 pub fn service_is_running(parameters: &TestParameters) -> ChaosResult<()> {
-    let parameters: ServiceCommand = parameters.try_into().unwrap();
+    let parameters: ServiceCommand = parameters.try_into()?;
     let sc_manager = get_manager_handle()?;
     let service = match open_service_with_manager(&parameters.name, sc_manager) {
         Ok(v) => v,
@@ -73,7 +73,7 @@ pub fn service_is_running(parameters: &TestParameters) -> ChaosResult<()> {
 }
 
 pub fn restart_service(parameters: &TestParameters) -> ChaosResult<()> {
-    let parameters: ServiceCommand = parameters.try_into().unwrap();
+    let parameters: ServiceCommand = parameters.try_into()?;
     let sc_manager = get_manager_handle()?;
     let service = match open_service_with_manager(&parameters.name, sc_manager) {
         Ok(v) => v,

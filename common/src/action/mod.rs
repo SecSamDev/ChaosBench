@@ -13,7 +13,7 @@ pub mod install;
 pub mod names;
 pub mod service;
 
-#[derive(Clone, Debug, Default, Serialize, PartialEq, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Hash)]
 pub enum TestActionType {
     /// Install the application
     Install,
@@ -44,6 +44,34 @@ pub enum TestActionType {
     #[default]
     Null,
     Custom(String),
+}
+impl Serialize for TestActionType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer {
+        serializer.serialize_str(match self {
+            TestActionType::Install => "Install",
+            TestActionType::Uninstall => "Uninstall",
+            TestActionType::InstallWithError => "InstallWithError",
+            TestActionType::RestartService => "RestartService",
+            TestActionType::StopService => "StopService",
+            TestActionType::StartService => "StartService",
+            TestActionType::ServiceIsRunning => "ServiceIsRunning",
+            TestActionType::RestartHost => "RestartHost",
+            TestActionType::Execute => "Execute",
+            TestActionType::CleanTmpFolder => "CleanTmpFolder",
+            TestActionType::CleanAppFolder => "CleanAppFolder",
+            TestActionType::SetAppEnvVars => "SetAppEnvVars",
+            TestActionType::SetEnvVar => "SetEnvVar",
+            TestActionType::DeleteEnvVar => "DeleteEnvVar",
+            TestActionType::ResetAppEnvVars => "ResetAppEnvVars",
+            TestActionType::StartUserSession => "StartUserSession",
+            TestActionType::CloseUserSession => "CloseUserSession",
+            TestActionType::Download => "Download",
+            TestActionType::Null => "Null",
+            TestActionType::Custom(v) => v,
+        })
+    }
 }
 
 struct TestActionTypeVisitor;

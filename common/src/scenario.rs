@@ -12,7 +12,7 @@ pub struct TestScene {
     pub phases : Vec<TestActionType>,
     #[serde(default = "default_timeout", deserialize_with = "deserialize_null_default")]
     pub timeout : Duration,
-    #[serde(default = "default_timeout", deserialize_with = "deserialize_null_default")]
+    #[serde(default = "default_timeout", deserialize_with = "deserialize_duration", serialize_with = "serialize_duration")]
     pub phase_timeout : Duration
 }
 
@@ -40,7 +40,7 @@ pub struct TestScenario {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ScenePreparation {
-    #[serde(default = "default_timeout", deserialize_with = "deserialize_duration")]
+    #[serde(default = "default_timeout", deserialize_with = "deserialize_duration", serialize_with = "serialize_duration")]
     pub phase_timeout : Duration,
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub cleanup : ScenePreparationActions,

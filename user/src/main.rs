@@ -63,6 +63,7 @@ fn read_commands(mut client: WebSocket<MaybeTlsStream<TcpStream>>) {
         "list-scenarios",
         "list-test-scenarios",
         "logs",
+        "backup",
         "exit",
     ];
     let mut history = BasicHistory::new().max_entries(16).no_duplicates(true);
@@ -97,6 +98,7 @@ fn print_help() {
     println!("edit-scenario: Edit parameters of a testing scenario");
     println!("list-scenarios: List all file scenarios");
     println!("list-test-scenarios: List all testing scenarios");
+    println!("backup: Saves the server state to disk");
     println!("exit: exits the cli");
 }
 
@@ -136,7 +138,15 @@ fn to_ws_message(
                 .interact_text()
                 .unwrap();
             UserAction::CreateScenario(CreateScenario { base_id, id })
-        }
+        },
+        "backup" => {
+            let backup = Input::<String>::new()
+                .with_prompt("Backup name")
+                .history_with(history)
+                .interact_text()
+                .unwrap();
+            UserAction::BackupDB(backup)
+        },
         "logs" => {
             listen_to_logs(client);
             return None;
@@ -166,7 +176,7 @@ fn listen_to_logs(client: &mut WebSocket<MaybeTlsStream<TcpStream>>) {
         }
         let msg = process_message(client).unwrap();
         if let UserActionResponse::Logs(log) = msg {
-            println!("{} - {}", log.agent, log.msg);
+            println!("{} - {}", log.agent, log.msg.trim());
         }else {
             println!("{:?}", msg);
         }

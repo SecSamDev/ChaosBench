@@ -55,7 +55,7 @@ fn agent_loop(state : &mut AgentState, client : &mut WsClient) -> Result<(), tun
 }
 
 fn check_shutdown_signal(signal : &Receiver<StopCommand>, state : &mut AgentState) -> bool {
-    match signal.recv_timeout(Duration::from_secs_f32(1.0)) {
+    match signal.recv_timeout(Duration::from_secs_f32(0.2)) {
         Ok(v) => {
             if let StopCommand::Shutdown = v {
                 signal_agent_shutdown(state);
@@ -79,8 +79,9 @@ fn create_ws_client() -> Result<WsClient, tungstenite::Error>{
         Err(e) => return handshake_correction(e, 100)
     };
     if let MaybeTlsStream::Plain(stream) = client.get_ref() {
-        let _ = stream.set_nonblocking(true);
-        //let _ = stream.set_read_timeout(Some(Duration::from_secs_f32(5.0)));
+        //let _ = stream.set_nonblocking(true);
+        let _ = stream.set_read_timeout(Some(Duration::from_secs_f32(0.2)));
+        let _ = stream.set_write_timeout(Some(Duration::from_secs_f32(5.0)));
     }
     log::info!("Agent connected to: {}", route);
     Ok(client)
@@ -120,51 +121,71 @@ fn on_start_service(state : &mut AgentState, client : &mut WsClient) -> Option<b
 }
 
 fn send_logs(state : &mut AgentState, client : &mut WsClient) -> Result<(), tungstenite::Error> {
-    let log = match state.try_recv_log() {
-        Some(v) => v,
-        None => return Ok(())
-    };
-    client.send(agent_request_to_message(&AgentRequest::Log(log)))?;
-    Ok(())
+    let mut c = 0;
+    loop {
+        if c > 5 {
+            return Ok(())
+        }
+        let log = match state.try_recv_log() {
+            Some(v) => v,
+            None => {
+                c += 1;
+                continue;
+            }
+        };
+        c = 0;
+        client.send(agent_request_to_message(&AgentRequest::Log(log)))?;
+    }
 }
 
 fn read_messages(state : &mut AgentState, client : &mut WsClient) -> Result<(), tungstenite::Error> {
-    let a = match client.read() {
-        Ok(v) => v,
-        Err(e) => match e {
-            tungstenite::Error::Io(io) => {
-                match io.kind() {
-                    std::io::ErrorKind::WouldBlock => return Ok(()),
-                    _ => return Err(tungstenite::Error::Io(io))
-                }
+    loop {
+        let a = match client.read() {
+            Ok(v) => v,
+            Err(e) => match e {
+                tungstenite::Error::Io(io) => {
+                    match io.kind() {
+                        std::io::ErrorKind::TimedOut => return Ok(()),
+                        std::io::ErrorKind::WouldBlock => return Ok(()),
+                        _ => return Err(tungstenite::Error::Io(io))
+                    }
+                },
+                _ => return Err(e)
+            }
+        };
+        let res = match message_to_agent_response(a) {
+            Some(v) => v,
+            None => return Ok(())
+        };
+        log::info!("{:?}", res);
+        match res {
+            AgentResponse::NextTask(task) => {
+                state.db.set_current_task(Some(task));
             },
-            _ => return Err(e)
+            AgentResponse::CleanTask => {
+                state.db.set_current_task(None);
+            },
+            AgentResponse::Parameters(v) => {
+                state.db.set_global_parameters(v);
+            },
+            AgentResponse::CustomActions(v) => {
+                state.db.set_commands(v);
+            }
+            AgentResponse::Stop => {
+                state.signal_shutdown(StopCommand::Stop);
+            },
+            AgentResponse::Variables(_) => {
+    
+            },
+            AgentResponse::Wait => {
+                log::info!("No task to execute. Waiting...");
+                send_logs(state, client)?;
+                std::thread::sleep(Duration::from_secs_f32(30.0));
+                break
+            },
         }
-    };
-    let res = match message_to_agent_response(a) {
-        Some(v) => v,
-        None => return Ok(())
-    };
-    match res {
-        AgentResponse::NextTask(task) => {
-            state.db.set_current_task(Some(task));
-        },
-        AgentResponse::CleanTask => {
-            state.db.set_current_task(None);
-        },
-        AgentResponse::Parameters(v) => {
-            state.db.set_global_parameters(v);
-        },
-        AgentResponse::CustomActions(v) => {
-            state.db.set_commands(v);
-        }
-        AgentResponse::Stop => {
-            state.signal_shutdown(StopCommand::Stop);
-        },
-        AgentResponse::Wait => {
-            std::thread::sleep(Duration::from_secs_f32(30.0));
-        },
     }
+    
 
     Ok(())
 }
@@ -178,7 +199,7 @@ fn do_work(state : &mut AgentState, client : &mut WsClient) -> Result<(), tungst
         },
         Some(v) => v.clone(),
     };
-    log::info!("Task to execute: {}", task.id);
+    log::info!("Task to execute ID={} Start={} Limit={} TTL={}", task.id, task.start, task.limit, (task.start + task.limit) - now_milliseconds());
     if task.start == 0 {
         task.start = now_milliseconds();
     }
@@ -188,16 +209,20 @@ fn do_work(state : &mut AgentState, client : &mut WsClient) -> Result<(), tungst
             let tries = state.increase_task_try();
             if task_reached_max_duration(&task) {
                 log::info!("Error executing task {} ({tries}): {:?}", task.id, err);
-                
+                task.end = Some(now_milliseconds());
+                task.result = Some(Err(ChaosError::Other(format!("Error executing task {} ({tries}): {:?}", task.id, err))));
             }
-            task.end = Some(now_milliseconds());
-            task.result = Some(Err(ChaosError::Other(format!("Error executing task {} ({tries}): {:?}", task.id, err))));
         }
     };
+    if task_reached_max_duration(&task) && task.result.is_none() {
+        log::warn!("Max timeout reached for task: {}", task.id);
+        task.end = Some(now_milliseconds());
+        task.result = Some(Err(ChaosError::Other(format!("Error executing task {}: Timeout reached", task.id))));
+    }
     if task.result.is_some() {
-        let send = task.clone();
-        state.db.update_current_task(task);
-        client.send(agent_request_to_message(&AgentRequest::CompleteTask(send.into())))?;
+        client.send(agent_request_to_message(&AgentRequest::CompleteTask(task.into())))?;
+        state.db.clean_current_task();
+        log::info!("Sent completed task");
     }else {
         state.db.update_current_task(task);
     }
@@ -205,8 +230,7 @@ fn do_work(state : &mut AgentState, client : &mut WsClient) -> Result<(), tungst
 }
 
 fn task_reached_max_duration(task : &AgentTaskInternal) -> bool {
-    let now = now_milliseconds();
-    now > task.start + task.limit
+    (task.start + task.limit) - now_milliseconds() < 0
 }
 
 fn signal_agent_shutdown(_state : &mut AgentState) {

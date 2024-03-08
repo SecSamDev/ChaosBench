@@ -29,7 +29,6 @@ pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, t
             return Err(ChaosError::Other(format!("Custom action {} not found", ca)))
         }
     }
-    task.start = now_milliseconds();
     let res = match &action {
         TestActionType::Install => installation::execute_install(&parameters),
         TestActionType::Uninstall => installation::execute_uninstall(&parameters),
@@ -39,16 +38,16 @@ pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, t
         TestActionType::StartService => service::start_service(&parameters),
         TestActionType::ServiceIsRunning => service::service_is_running(&parameters),
         TestActionType::RestartHost => machine::restart_host(&parameters),
-        TestActionType::Execute => todo!(),
-        TestActionType::CleanTmpFolder => todo!(),
-        TestActionType::CleanAppFolder => todo!(),
-        TestActionType::SetAppEnvVars => todo!(),
-        TestActionType::SetEnvVar => todo!(),
-        TestActionType::DeleteEnvVar => todo!(),
-        TestActionType::ResetAppEnvVars => todo!(),
-        TestActionType::StartUserSession => todo!(),
-        TestActionType::CloseUserSession => todo!(),
-        TestActionType::Download => todo!(),
+        TestActionType::Execute => Ok(()),
+        TestActionType::CleanTmpFolder => Ok(()),
+        TestActionType::CleanAppFolder => Ok(()),
+        TestActionType::SetAppEnvVars => Ok(()),
+        TestActionType::SetEnvVar => Ok(()),
+        TestActionType::DeleteEnvVar => Ok(()),
+        TestActionType::ResetAppEnvVars => Ok(()),
+        TestActionType::StartUserSession => Ok(()),
+        TestActionType::CloseUserSession => Ok(()),
+        TestActionType::Download => Ok(()),
         TestActionType::Null => Ok(()),
         TestActionType::Custom(action) => Err(chaos_core::err::ChaosError::Other(format!("Custom action {} not found", action))),
     };
