@@ -5,7 +5,8 @@ use chaos_core::
 ;
 
 use crate::{common::StopCommand, db::Database};
-pub const SERVER_ADDRESS : &str = env!("AGENT_SERVER_ADDRESS");
+pub const SERVER_ADDRESS : &str = env!("SERVER_ADDRESS");
+pub const SERVER_PORT : &str = env!("SERVER_PORT");
 
 /// Save the state of the agent in the database
 pub struct AgentState {
@@ -32,25 +33,23 @@ impl AgentState {
         self.logs = logs;
     }
     pub fn try_recv_log(&mut self) -> Option<String> {
-        let log = match self.logs.try_recv() {
-            Ok(v) => v,
-            Err(_) => return None
-        };
-        if self.log.is_none() && log.contains("\n") {
-            return Some(log)
+        loop {
+            let log = self.logs.try_recv().ok()?;
+            if self.log.is_none() && log.contains("\n") {
+                return Some(log)
+            }
+            if self.log.is_none() {
+                self.log = Some(log);
+                continue
+            }
+            let slog = self.log.as_mut()?;
+            slog.push_str(&log);
+            if slog.contains("\n") {
+                let mut tk = None;
+                std::mem::swap(&mut self.log, &mut tk);
+                return tk;
+            }
         }
-        if self.log.is_none() {
-            self.log = Some(log);
-            return None
-        }
-        let slog = self.log.as_mut()?;
-        slog.push_str(&log);
-        if slog.contains("\n") {
-            let mut tk = None;
-            std::mem::swap(&mut self.log, &mut tk);
-            return tk;
-        }
-        None
     }
 
     pub fn increase_task_try(&mut self) -> u32 {

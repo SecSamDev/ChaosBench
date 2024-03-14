@@ -7,37 +7,37 @@ parameters:
     - "arch:x64"
     - "name!:.*Debug.*"
   windows:
-    user_name: CNCMS\TestUser # Usuario necesario para iniciar sesión interactiva de usuario
-    user_password: TestUser123$ # Contraseña del usuario de pruebas
+    $installer: SuperprogramFile.msi
+    user_name: CNCMS\TestUser # User to start interactive session
+    user_password: TestUser123$ # Password to start interactive session
 
-    # Si la app tiene un servicio queremos saber el nombre o nombres. Usado por StartAppService que es un alias de StartService $name
+    # Name of the application service. Used by StartAppService and StartService
     service_name: superprogram 
 
     install_parameters:
       SERVER: 10.0.0.2:443
       API_KEY: 12345
-    # Para pruebas de parámetros erróneos
+    # Test that installation parameters give an error
     install_error_parameters:
       SERVER: not_a_hostname:123:123
       API_KEY: null
-    # (Opcional) Todo lo de después de /i xxx.msi /qn ..
+    # (Optional) extra command line after /i xxx.msi /qn ...
     install_command: /lv install_log.txt SERVER=10.0.0.2 API_KEY=12345 
-    # Custom command para desinstalar
+    # Custom uninstall command
     uninstall_command: ... 
-    # Custom parameters para desinstalar
+    # Custom uninstall parameters
     uninstall_parameters:
       force: true
-    # Informar sobre los ficheros que utiliza nuestra aplicación para facilitar limpieza
+    # All files and folders used by our application that needs to be cleaned after
     application_folders:
       - C:\Program Files\program
       - C:\ProgramData\program
       - "%APPDATA%\\Temp\\program"
     # https://serverfault.com/questions/813506/setting-environment-variable-for-service
-    service_env_vars: # Variables de entorno extra que se inyectarán en el servicio de la aplicación
-      # Estas siguientes las hará sola la aplicación para poder guardar artefactos que genere la app a testear
+    service_env_vars: # Custom env vars for the application service
       TEMP: C:\ProgramData\chaos\app_temp
       TMP: C:\ProgramData\chaos\app_temp
-    user_env_vars: # Variables de entorno extra para la sesión de usuario
+    user_env_vars: # Custom env vars for the user session
       TEMP: C:\ProgramData\chaos\user_temp
       TMP: C:\ProgramData\chaos\user_temp
   linux:
@@ -47,7 +47,7 @@ variables:
   windows:
     application_folder: C:\Program Files\program
 files:
-  - "Superprogram file.exe"
+  - "SuperprogramFile.msi"
 actions:
   - name: UninstallWithUninstaller
     action: Execute
@@ -61,23 +61,23 @@ scenario:
       - RestartMachine
 
 scene_preparation:
-  phase_timeout: 10s # Por defecto una fase no debe durar más de 10 segundos
+  phase_timeout: 10s
   cleanup:
     actions:
       - Uninstall
       - CleanFolders
       - ResetEnvVars
       - CloseUserSession
-  before: #Antes de ejecutar un escenario
+  before: # Before executing a scenario
     actions:
-      - CleanFolders # Limpia todos los directorios de la APP
+      - CleanFolders # Clean all application folders/files
       - SetupEnvVars
-  after_first: # Después de ejecutar la primera fase de un escenario
+  after_first: # After executing the first phase
     actions: []
-  before_last: # Antes de ejecutar la ultima fase de un escenario
+  before_last: # Before executing the last phase
     actions:
       - ExtractApplicationData
-  after: # Ejecutar al final de un escenario
+  after: # After executing a scenario
     actions:
       - CleanTmpFolder
       - ResetEnvVars
@@ -100,11 +100,11 @@ scenes:
     description: La aplicación debe actualizarse de forma automática
     phases:
       - Install
-      - UpdateByWeb # Custom command que se ejecuta en la web
+      - UpdateByWeb # Custom command
       - RestartService
   - name: Instalar e instalar encima
     description: La aplicación se debe instalar y debe no dejar instalar encima de la que ya hay
     phases:
       - Install
-      - InstallAlredyInstalledError # Prueba a instalar la aplicación y debe fallar
-      - InstallParameterError # Prueba a instalar con parámetros erroneos
+      - InstallAlredyInstalledError # Install when its alredy installed. Must give error
+      - InstallParameterError # Install with erroneous parameters. Must give error

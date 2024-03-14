@@ -4,7 +4,7 @@ use actix::{
     Actor, Addr, StreamHandler
 };
 use actix_web_actors::ws;
-use chaos_core::api::{agent::{AgentLogReq, AgentRequest, AgentResponse}, Log};
+use chaos_core::api::{agent::{AgentRequest, AgentResponse}, Log};
 
 use crate::{domains::connection::AgentLog, state::ServerState};
 

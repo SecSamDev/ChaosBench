@@ -19,4 +19,7 @@ anyhow = "*"
 serde = { version = "1", features = ["derive"]}
 serde_json = { version = "1" }
 serde_yaml = "0"
-tungstenite = "0.21.0"
+tungstenite = { version = "0.21.0", features = ["__rustls-tls"]}
+reqwest = {version = "0.11.26", default_features=false, features = ["rustls-tls", "rustls-tls-manual-roots", "blocking"]}
+rustls = {version = "0.22", default_features = false, features = ["tls12", "ring"]}
+rustls-pemfile = "2"

@@ -1,11 +1,11 @@
-use std::{default, fmt, time::Duration};
+use std::{fmt, time::Duration};
 
 use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize,
 };
 
-use crate::{err::ChaosResult, parameters::{ScenarioParameters, TestParameter, TestParameters}};
+use crate::{err::ChaosResult, parameters::{ScenarioParameters, TestParameters}};
 
 use self::names::TASK_TIMEOUT;
 
@@ -39,6 +39,10 @@ pub enum TestActionType {
     ResetAppEnvVars,
     StartUserSession,
     CloseUserSession,
+    /// Wait for the agent to make an HTTP request and apply a script to the request
+    HttpRequest,
+    /// Wait for the agent to make an HTTP request and apply a script to the response
+    HttpResponse,
     /// Downloads a file
     Download,
     #[default]
@@ -49,7 +53,13 @@ impl Serialize for TestActionType {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer {
-        serializer.serialize_str(match self {
+        serializer.serialize_str(self.into())
+    }
+}
+
+impl<'a> From<&'a TestActionType> for &'a str {
+    fn from(value: &TestActionType) -> &str {
+        match value {
             TestActionType::Install => "Install",
             TestActionType::Uninstall => "Uninstall",
             TestActionType::InstallWithError => "InstallWithError",
@@ -69,11 +79,12 @@ impl Serialize for TestActionType {
             TestActionType::CloseUserSession => "CloseUserSession",
             TestActionType::Download => "Download",
             TestActionType::Null => "Null",
-            TestActionType::Custom(v) => v,
-        })
+            TestActionType::HttpRequest => "HttpRequest",
+            TestActionType::HttpResponse => "HttpResponse",
+            TestActionType::Custom(v) => v.as_str(),
+        }
     }
 }
-
 struct TestActionTypeVisitor;
 
 impl<'de> Visitor<'de> for TestActionTypeVisitor {

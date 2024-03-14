@@ -1,6 +1,6 @@
-use std::{collections::{BTreeMap, BTreeSet}, sync::{Arc, Mutex}};
+use std::{collections::BTreeMap, sync::{Arc, Mutex}};
 
-use chaos_core::{scenario::TestScenario, tasks::{AgentTask, AgentTaskResult}};
+use chaos_core::{api::agent::ConnectAgent, scenario::TestScenario, tasks::AgentTaskResult};
 use serde::{Deserialize, Serialize};
 
 use crate::domains::scenario::CalculatedScenario;
@@ -22,7 +22,7 @@ impl MemoryRepository {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Database {
-    pub agents : BTreeSet<String>,
+    pub agents : BTreeMap<String, ConnectAgent>,
     /// Actual scenario in execution
     pub scenario : Option<CalculatedScenario>,
     pub scenarios : BTreeMap<String, TestScenario>,
@@ -39,7 +39,7 @@ pub struct AgentSceneState {
 impl Database {
     pub fn load() -> Database {
         let content = std::fs::read_to_string("./database.db").unwrap_or_default();
-        let database : Database = serde_json::from_str(&content).unwrap();
+        let database : Database = serde_json::from_str(&content).unwrap_or_default();
         log::info!("Loaded database with scenarios={} and executing={}", database.scenarios.len(), database.scenario.as_ref().map(|v| v.name.clone()).unwrap_or_default());
         database
     }

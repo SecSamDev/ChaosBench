@@ -2,7 +2,13 @@
 
 A simple tool for testing application packages across multiple platforms.
 
-## Scenario design
+# Index
+1. [Scenario design](#scenario-design)
+2. [Report generation](#report-gen)
+3. [Intercept HTTP requests](#http-intercept)
+4. [Building](#building)
+
+## Scenario design<a id="scenario-design"></a>
 
 ```yaml
 name: All tests
@@ -110,7 +116,41 @@ scenes:
       - InstallParameterError # Install with erroneous parameters. Must give error
 ```
 
-## Building
+## Report Generation<a id="report-gen"></a>
+
+<details>
+<summary>Show Report</summary>
+
+># Pruebas Full
+>
+>## Simple Install/Uninstall
+>
+><details>
+><summary>Show test</summary>
+>
+>|ID|State|Action|Agent|Hostname|Error|
+>|-----|-----|-----|-----|-----|-----|
+>|0|❌|CleanFolders|db4fd010-52e4-4c30-a52a-d3e4a90b216a|PC-TEST-1|Custom action CleanFolders not found|
+>|1|❌|SetupEnvVars|db4fd010-52e4-4c30-a52a-d3e4a90b216a|PC-TEST-1|Custom action SetupEnvVars not found|
+>|2|❌|Install|db4fd010-52e4-4c30-a52a-d3e4a90b216a|PC-TEST-1|Installer name "$installer" not found|
+>|3|✅|StartUserSession|db4fd010-52e4-4c30-a52a-d3e4a90b216a|PC-TEST-1||
+>|4|❌|ExtractApplicationData|db4fd010-52e4-4c30-a52a-d3e4a90b216a|PC-TEST-1|Custom action ExtractApplicationData not found|
+>|5|❌|Uninstall|db4fd010-52e4-4c30-a52a-d3e4a90b216a|PC-TEST-1|Installer name "$installer" not found|
+>|6|✅|CleanTmpFolder|db4fd010-52e4-4c30-a52a-d3e4a90b216a|PC-TEST-1||
+>|7|❌|ResetEnvVars|db4fd010-52e4-4c30-a52a-d3e4a90b216a|PC-TEST-1|Custom action ResetEnvVars not found|
+>|8|✅|CloseUserSession|db4fd010-52e4-4c30-a52a-d3e4a90b216a|PC-TEST-1||
+></details>
+>
+></details>
+
+## Http interception<a id="http-intercept"></a>
+
+The chaos server allows you to intercept HTTP traffic and apply scripts to validate that the requests and responses from the application being tested are as expected.
+This can be achieved with the Actions HttpRequest and HttpResponse which forwards the petition to the real server.
+The scripting language is *Rhai* to simplify the compilation process. In the scope of the executed script the request body is seted as "body", the headers as a map of strings named "headers" and the status code of the response as "status_code". Depending on the content type the body will be a serde_json::Value or a Vec\<u8\>.
+For the interception to work properly the application must include the SSL certificate of the chaos server.
+
+## Building<a id="building"></a>
 The project uses a custom cargo command: [Xtask](https://github.com/matklad/cargo-xtask) to build all the components.
 
 ### Preparation
@@ -118,7 +158,11 @@ The server address is statically setted in the agent as to not have a configurat
 
 ```toml
 [env]
-AGENT_SERVER_ADDRESS = "127.0.0.1:8080"
+CA_CERT = "..\\..\\.cargo\\myCA.pem"
+SERVER_CERTIFICATE = "..\\..\\.cargo\\certs.crt"
+SERVER_KEY = "..\\..\\.cargo\\key.key"
+SERVER_PORT = "443"
+SERVER_ADDRESS = "security.com"
 
 [alias]
 xtask = "run --package xtask --"

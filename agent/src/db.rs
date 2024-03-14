@@ -32,6 +32,7 @@ impl Database {
     }
     pub fn set_current_task(&mut self, task: Option<AgentTask>) {
         self.current_task = task.map(|v| AgentTaskInternal {
+            scene_id : v.scene_id,
             action : v.action,
             agent : v.agent,
             end : None,

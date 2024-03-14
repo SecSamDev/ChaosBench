@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct AgentTaskInternal {
     pub id : u32,
+    pub scene_id : u32,
     pub agent : String,
     pub limit : i64,
     pub start : i64,
@@ -56,6 +57,7 @@ pub fn create_file_path_in_user_temp(filename : &str) -> PathBuf {
 impl From<AgentTaskInternal> for AgentTaskResult {
     fn from(v: AgentTaskInternal) -> Self {
         AgentTaskResult {
+            scene_id : v.scene_id,
             action : v.action,
             agent : v.agent,
             end : v.end.unwrap_or_default(),
@@ -71,6 +73,7 @@ impl From<AgentTaskInternal> for AgentTaskResult {
 impl From<&AgentTaskInternal> for AgentTaskResult {
     fn from(v: &AgentTaskInternal) -> Self {
         AgentTaskResult {
+            scene_id : v.id,
             action : v.action.clone(),
             agent : v.agent.clone(),
             end : v.end.unwrap_or_default(),

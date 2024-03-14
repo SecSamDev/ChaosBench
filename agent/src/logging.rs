@@ -10,8 +10,6 @@ use log4rs::encode::pattern::PatternEncoder;
 use log4rs::config::{Appender, Config, Root};
 use log4rs::encode::Encode;
 
-use crate::sys_info::get_system_uuid;
-
 #[cfg(not(feature="no_service"))]
 pub fn init_logging() -> Option<Receiver<String>> {
     let pattern = "{d(%Y-%m-%d %H:%M:%S)} | {T} | {({l}):5.5} | {m}{n}";

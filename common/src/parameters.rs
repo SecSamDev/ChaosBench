@@ -8,6 +8,8 @@ use serde::{
 
 use crate::{common::{deserialize_null_default, string_to_duration}, variables::TestVariables};
 
+pub const REMOTE_SERVER : &str = "remote_server";
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, Hash)]
 pub struct ScenarioParameters {
     #[serde(flatten)]

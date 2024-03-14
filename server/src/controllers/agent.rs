@@ -1,24 +1,29 @@
 use actix_web::{
-    web::{self, Data, Json, Path},
+    web::{self, Data, Path},
     HttpRequest, HttpResponse, Responder,
 };
 use actix_web_actors::ws;
-use chaos_core::{api::agent::*, tasks::AgentTask};
+use chaos_core::api::agent::ConnectAgent;
 
 use crate::{actors, state::ServerState};
 
 pub fn agent_config(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::resource("/agent/connect/{agent_id}").route(web::get().to(connect_agent)))
-        .service(web::resource("/agent/file/{filename}").route(web::get().to(download_file)));
+    cfg.service(web::resource("/_agent/connect").route(web::get().to(connect_agent)))
+        .service(web::resource("/_agent/file/{filename}").route(web::get().to(download_file)));
 }
 
 async fn connect_agent(
-    req : HttpRequest, stream : web::Payload, state : Data<ServerState>, agent_id : Path<String>
+    req : HttpRequest, stream : web::Payload, state : Data<ServerState>
 ) -> impl Responder {
     let ip = req.peer_addr().map(|v| v.ip().to_string()).unwrap_or_default();
-    log::info!("Agent connection from ip={}", ip);
-    let connection = ws::start(actors::agent::AgentConnection::new(agent_id.as_str().to_string(),state.as_ref().clone()), &req, stream);
-    connection
+    let info = match agent_info(&req) {
+        Some(v) => v,
+        None => return HttpResponse::Forbidden().await
+    };
+    log::info!("Agent {} on {} connected with ip {ip}", info.id, info.hostname);
+    let id = info.id.clone();
+    state.services.register_new_agent(info);
+    ws::start(actors::agent::AgentConnection::new(id, state.as_ref().clone()), &req, stream)
 }
 
 async fn download_file(
@@ -33,4 +38,18 @@ async fn download_file(
         Err(_) => return HttpResponse::NotFound().finish()
     };
     file.into_response(&request)
+}
+
+fn agent_info(req : &HttpRequest) -> Option<ConnectAgent> {
+    let agent_id = req.headers().get("Agent-Id")?.to_str().ok()?;
+    let agent_host = req.headers().get("Agent-Host")?.to_str().ok()?;
+    let arch = req.headers().get("Agent-Arch")?.to_str().ok()?;
+    let os = req.headers().get("Agent-Os")?.to_str().ok()?;
+    Some(ConnectAgent {
+        id : agent_id.to_string(),
+        hostname : agent_host.to_string(),
+        arch : arch.into(),
+        os : os.into(),
+        ip : req.connection_info().peer_addr().unwrap_or_default().to_string()
+    })
 }

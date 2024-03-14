@@ -1,14 +1,15 @@
 use chaos_core::{action::install::{InstallParameters, InstallWithErrorParameters}, parameters::TestParameters, err::ChaosResult};
 
-use crate::common::create_file_path_in_workspace;
+use crate::{api::download_file, common::create_file_path_in_workspace};
 
 pub fn execute_install(parameters: &TestParameters) -> ChaosResult<()> {
     let parameters: InstallParameters = parameters.try_into()?;
     let mut command = std::process::Command::new(r"C:\Windows\System32\msiexec.exe");
     let log_location = create_file_path_in_workspace("install.log");
+    let file_location = download_file(&parameters.installer)?;
     command
         .arg("/i")
-        .arg(&parameters.installer)
+        .arg(&file_location.to_string_lossy()[..])
         .arg("/qn")
         .arg("/l*v")
         .arg(log_location.as_os_str());
@@ -20,9 +21,10 @@ pub fn execute_uninstall(parameters: &TestParameters)-> ChaosResult<()> {
     let parameters: InstallParameters = parameters.try_into()?;
     let mut command = std::process::Command::new(r"C:\Windows\System32\msiexec.exe");
     let log_location = create_file_path_in_workspace("uninstall.log");
+    let file_location = download_file(&parameters.installer)?;
     command
         .arg("/x")
-        .arg(&parameters.installer)
+        .arg(&file_location.to_string_lossy()[..])
         .arg("/qn")
         .arg("/l*v")
         .arg(log_location.as_os_str());
@@ -34,9 +36,10 @@ pub fn execute_install_with_error(parameters: &TestParameters) -> ChaosResult<()
     let parameters: InstallWithErrorParameters = parameters.try_into()?;
     let mut command = std::process::Command::new(r"C:\Windows\System32\msiexec.exe");
     let log_location = create_file_path_in_workspace("uninstall.log");
+    let file_location = download_file(&parameters.installer)?;
     command
         .arg("/x")
-        .arg(&parameters.installer)
+        .arg(&file_location.to_string_lossy()[..])
         .arg("/qn")
         .arg("/l*v")
         .arg(log_location.as_os_str());

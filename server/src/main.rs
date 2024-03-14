@@ -5,6 +5,7 @@ use actix_web::{HttpServer, App, web::Data, middleware::Logger};
 use actors::logs::LogServer;
 use chaos_core::scenario::TestScenario;
 use repository::memory::{Database, MemoryRepository};
+use rustls::{pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs1KeyDer, PrivatePkcs8KeyDer}, server::{NoClientAuth, ServerConfig}};
 use services::production::ProductionService;
 use state::ServerState;
 use telemetry::init_logging;
@@ -15,12 +16,27 @@ pub mod telemetry;
 pub mod services;
 pub mod repository;
 pub mod actors;
+pub mod utils;
 
-const DEFAULT_SERVER_PORT: u16 = 8080;
+const DEFAULT_SERVER_PORT : u16 = 8080;
+pub const SERVER_CERTIFICATE : &[u8] = include_bytes!(env!("SERVER_CERTIFICATE"));
+pub const SERVER_KEY : &[u8] = include_bytes!(env!("SERVER_KEY"));
+pub const SERVER_PORT : &str = env!("SERVER_PORT");
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     init_logging();
+    let cert_chain = match rustls_pemfile::read_one_from_slice(SERVER_CERTIFICATE).unwrap().unwrap().0 {
+        rustls_pemfile::Item::X509Certificate(v) => vec![v],
+        _ => panic!("Server certificate invalid"),
+    };
+    let key_der = match rustls_pemfile::read_one_from_slice(SERVER_KEY).unwrap().unwrap().0 {
+        rustls_pemfile::Item::Pkcs1Key(v) => v.into(),
+        rustls_pemfile::Item::Pkcs8Key(v) => v.into(),
+        rustls_pemfile::Item::Sec1Key(v) => v.into(),
+        _ => panic!("Private key format not supported"),
+    };
+    let config = ServerConfig::builder().with_no_client_auth().with_single_cert(cert_chain, key_der).unwrap();
     let (address, port) = listening_parameters();
     log::info!("Listening on: {}:{}", address, port);
     let scenarios = Arc::new(read_test_scenarios());
@@ -35,16 +51,15 @@ async fn main() -> std::io::Result<()> {
             .wrap(Logger::default())
             .configure(controllers::config)
     });
-    let _ = server.bind((address, port))?.run().await;
+    let _ = server.bind_rustls_0_22((address, port), config)?.run().await;
+    //let _ = server.bind((address, port))?.run().await;
     db.lock().unwrap().save();
     Ok(())
 }
 
 pub fn listening_parameters() -> (String, u16) {
     let address = std::env::var("SERVER_ADDRESS").unwrap_or_else(|_| "0.0.0.0".into());
-    let port = std::env::var("SERVER_PORT")
-        .map(|v| v.parse::<u16>().unwrap_or(DEFAULT_SERVER_PORT))
-        .unwrap_or_else(|_| DEFAULT_SERVER_PORT);
+    let port = SERVER_PORT.parse::<u16>().unwrap_or(DEFAULT_SERVER_PORT);
     (address, port)
 }
 

@@ -1,10 +1,8 @@
-use std::default;
-
 use serde::{Serialize, Deserialize};
 
 use crate::err::ChaosResult;
 
-use super::Log;
+use super::{Log, TestingReport};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum UserAction {
@@ -16,6 +14,7 @@ pub enum UserAction {
     CreateScenario(CreateScenario),
     EnumerateScenarios,
     EnumerateTestingScenarios,
+    Report,
     #[default]
     None
 }
@@ -34,6 +33,7 @@ pub enum UserActionResponse {
     CreateScenario(ChaosResult<()>),
     EnumerateScenarios(Vec<String>),
     EnumerateTestingScenarios(Vec<String>),
+    Report(TestingReport),
     #[default]
     None
 }

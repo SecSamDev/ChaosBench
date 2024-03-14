@@ -1,4 +1,4 @@
-use actix::{Actor, Addr, AsyncContext, Handler, Message as ActixMessage, Recipient, StreamHandler};
+use actix::{Actor, Addr, AsyncContext, Handler, StreamHandler};
 use actix_web_actors::ws;
 use chaos_core::api::user_actions::{CreateScenario, UserAction, UserActionResponse};
 
@@ -66,6 +66,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for UserConnection {
                 });
                 return
             },
+            UserAction::Report => generate_report(&self.state),
             UserAction::BackupDB(v) => backup_db(v, &self.state),
             UserAction::StartScenario(v) => start_scenario(v, &self.state),
             UserAction::StopScenario(v) => stop_scenario(v, &self.state),
@@ -106,7 +107,10 @@ fn list_testing_scenarios(state : &ServerState) -> Option<UserActionResponse> {
     let scenarios = state.services.list_testing_scenarios();
     Some(UserActionResponse::EnumerateTestingScenarios(scenarios))
 }
-
+fn generate_report(state : &ServerState) -> Option<UserActionResponse> {
+    let rprt = state.services.generate_report().ok()?;
+    Some(UserActionResponse::Report(rprt))
+}
 
 fn process_user_message(msg : &[u8]) -> Option<UserAction> {
     Some(serde_json::from_slice(msg).ok()?)

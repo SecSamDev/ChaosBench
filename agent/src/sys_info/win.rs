@@ -4,13 +4,13 @@ use windows::{
     core::PWSTR,
     Win32::System::{
         SystemInformation::{GetSystemFirmwareTable, RSMB},
-        WindowsProgramming::GetComputerNameW,
+        WindowsProgramming::{GetComputerNameW, MAX_COMPUTERNAME_LENGTH},
     },
 };
 
 pub fn get_hostname() -> ChaosResult<String> {
-    let mut buffer = [0u16; 1024];
-    let mut size = 0;
+    let mut buffer = [0u16; MAX_COMPUTERNAME_LENGTH as usize + 1];
+    let mut size = buffer.len() as u32;
     if let Err(e) = unsafe { GetComputerNameW(PWSTR(buffer.as_mut_ptr()), &mut size) } {
         return Err(ChaosError::Other(e.to_string()));
     }

@@ -1,5 +1,4 @@
 use common::set_home;
-use logging::init_logging;
 
 mod services;
 pub(crate) mod common;
@@ -10,6 +9,7 @@ pub(crate) mod state;
 pub(crate) mod logging;
 pub(crate) mod sys_info;
 pub(crate) mod db;
+pub(crate) mod api;
 
 fn main() {
     set_home();

@@ -51,6 +51,8 @@ pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, t
         TestActionType::CloseUserSession => Ok(()),
         TestActionType::Download => Ok(()),
         TestActionType::Null => Ok(()),
+        TestActionType::HttpRequest => Ok(()),
+        TestActionType::HttpResponse => Ok(()),
         TestActionType::Custom(action) => Err(chaos_core::err::ChaosError::Other(format!("Custom action {} not found", action))),
     };
     task.result = Some(res);

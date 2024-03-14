@@ -1,12 +1,14 @@
 pub mod production;
-use chaos_core::{err::ChaosResult, scenario::TestScenario, tasks::{AgentTask, AgentTaskResult}};
+use chaos_core::{api::{agent::ConnectAgent, TestingReport}, err::ChaosResult, scenario::TestScenario, tasks::{AgentTask, AgentTaskResult}};
 
 pub trait ServerServices {
+    /// Gets the remote server when intercepting requests
+    fn remote_server(&self) -> ChaosResult<String>;
 
     fn backup_db(&self, location : &str) -> ChaosResult<()>;
 
     /// Registers a new agent
-    fn register_new_agent(&self);
+    fn register_new_agent(&self, info : ConnectAgent);
 
     /// Get scenario configuration state
     fn hash_state(&self) -> u64;
@@ -48,4 +50,8 @@ pub trait ServerServices {
     fn list_scenarios(&self) -> Vec<String>;
     /// Sets a task as executed
     fn set_task_as_executed(&self, task : AgentTaskResult);
+
+    fn agent_from_ip(&self, ip : &str) -> ChaosResult<ConnectAgent>;
+
+    fn generate_report(&self) -> ChaosResult<TestingReport>;
 }

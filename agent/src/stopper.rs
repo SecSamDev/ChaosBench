@@ -1,9 +1,10 @@
-use std::{net::TcpStream, sync::mpsc::{Receiver, RecvTimeoutError, SyncSender}, time::{Duration, SystemTime, UNIX_EPOCH}};
+use std::{net::TcpStream, str::FromStr, sync::{mpsc::{Receiver, RecvTimeoutError, SyncSender}, Arc}, time::{Duration, SystemTime, UNIX_EPOCH}};
 
-use chaos_core::{action::TestActionType, api::agent::{AgentRequest, AgentResponse}, err::ChaosError, tasks::AgentTaskResult};
-use tungstenite::{stream::MaybeTlsStream, ClientHandshake, HandshakeError, Message, WebSocket};
+use chaos_core::{action::TestActionType, api::agent::{AgentRequest, AgentResponse, ConnectAgent}, err::ChaosError, tasks::AgentTaskResult};
+use rustls::{ClientConfig, RootCertStore};
+use tungstenite::{handshake::client::generate_key, http::{Uri, Version}, stream::MaybeTlsStream, Message, WebSocket};
 
-use crate::{actions::execute_action, common::{now_milliseconds, AgentTaskInternal, StopCommand}, logging::init_logging, state::{AgentState, SERVER_ADDRESS}, sys_info::get_system_uuid};
+use crate::{actions::execute_action, api::SERVER_CERTIFICATE, common::{now_milliseconds, AgentTaskInternal, StopCommand}, logging::init_logging, state::{AgentState, SERVER_ADDRESS, SERVER_PORT}, sys_info::{get_hostname, get_system_uuid}};
 
 type WsClient = WebSocket<MaybeTlsStream<TcpStream>>;
 
@@ -71,35 +72,42 @@ fn check_shutdown_signal(signal : &Receiver<StopCommand>, state : &mut AgentStat
 
 fn create_ws_client() -> Result<WsClient, tungstenite::Error>{
     let agent = get_system_uuid().unwrap();
-    let route = format!("ws://{}/agent/connect/{}", SERVER_ADDRESS, agent);
-    let stream = TcpStream::connect(SERVER_ADDRESS)?;
-    
-    let (client, _) = match tungstenite::client::client(&route, MaybeTlsStream::Plain(stream)) {
-        Ok(v) => v,
-        Err(e) => return handshake_correction(e, 100)
+    let hostname = get_hostname().unwrap_or_default();
+    let route = format!("wss://{}:{}/_agent/connect", SERVER_ADDRESS, SERVER_PORT);
+    let req = ConnectAgent::default();
+    let uri = tungstenite::http::Uri::from_str(&route)?;
+    let req = tungstenite::http::Request::builder()
+        .uri(&route)
+        .version(tungstenite::http::Version::HTTP_11)
+        .header("Sec-WebSocket-Protocol", "ws")
+        .header("Sec-WebSocket-Key", generate_key())
+        .header("Connection", "Upgrade")
+        .header("Upgrade", "websocket")
+        .header("Agent-Id", agent)
+        .header("Agent-Host", hostname)
+        .header("Agent-Arch", Into::<&str>::into(req.arch))
+        .header("Agent-Os", Into::<&str>::into(req.os))
+        .header("Sec-WebSocket-Version", 13)
+        .header("Host", uri.host().unwrap());
+    let request = tungstenite::handshake::client::Request::from(req.body(())?);
+    let mut root_store = RootCertStore::empty();
+    let cert = rustls_pemfile::read_one_from_slice(SERVER_CERTIFICATE).unwrap().unwrap().0;
+    let cert = match cert {
+        rustls_pemfile::Item::X509Certificate(v) => v,
+        _ => panic!("Invalid CA certificate format"),
     };
-    if let MaybeTlsStream::Plain(stream) = client.get_ref() {
+    root_store.add(cert).unwrap();
+    let config = Arc::new(ClientConfig::builder().with_root_certificates(root_store).with_no_client_auth());
+    let sock = TcpStream::connect(&format!("{}:{}", SERVER_ADDRESS, SERVER_PORT)).unwrap();
+    
+    let (client, _response) = tungstenite::client_tls_with_config(request, sock, None, Some(tungstenite::Connector::Rustls(config))).unwrap();
+    if let MaybeTlsStream::Rustls(stream) = client.get_ref() {
         //let _ = stream.set_nonblocking(true);
-        let _ = stream.set_read_timeout(Some(Duration::from_secs_f32(0.2)));
-        let _ = stream.set_write_timeout(Some(Duration::from_secs_f32(5.0)));
+        let _ = stream.sock.set_read_timeout(Some(Duration::from_secs_f32(0.2)));
+        let _ = stream.sock.set_write_timeout(Some(Duration::from_secs_f32(5.0)));
     }
     log::info!("Agent connected to: {}", route);
     Ok(client)
-}
-
-fn handshake_correction(e : HandshakeError<ClientHandshake<MaybeTlsStream<TcpStream>>>, iter : usize) -> Result<WsClient, tungstenite::Error> {
-    if iter == 0 {
-        return Err(tungstenite::Error::ConnectionClosed)
-    }
-    let handhake = match e {
-        tungstenite::HandshakeError::Interrupted(v) => v,
-        tungstenite::HandshakeError::Failure(e) => return Err(e)
-    };
-    let e = match handhake.handshake() {
-        Ok(v) => return Ok(v.0),
-        Err(e) => e
-    };
-    handshake_correction(e, iter - 1)
 }
 
 fn on_start_service(state : &mut AgentState, client : &mut WsClient) -> Option<bool> {

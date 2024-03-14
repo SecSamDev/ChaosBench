@@ -1,9 +1,9 @@
 use std::{
-    io::{stdin, IsTerminal, Read},
+    io::Write,
     net::TcpStream,
     sync::{
         atomic::AtomicBool,
-        mpsc::{sync_channel, Receiver, SyncSender},
+        mpsc::Receiver,
         Arc,
     },
     time::Duration,
@@ -11,19 +11,38 @@ use std::{
 
 use chaos_core::api::user_actions::{CreateScenario, UserAction, UserActionResponse};
 use dialoguer::{BasicHistory, Input, Select};
+use rustls::{ClientConfig, RootCertStore};
 use tungstenite::{stream::MaybeTlsStream, WebSocket};
 
-const SERVER_ADDRESS: &str = env!("AGENT_SERVER_ADDRESS");
+const SERVER_ADDRESS: &str = env!("SERVER_ADDRESS");
+const SERVER_PORT: &str = env!("SERVER_PORT");
+pub const SERVER_CERTIFICATE : &[u8] = include_bytes!(env!("CA_CERT"));
+
+type WsClient = WebSocket<MaybeTlsStream<TcpStream>>;
 
 fn main() {
-    let route = format!("ws://{}/user/connect", SERVER_ADDRESS);
-    let (mut client, response) = tungstenite::client::connect(&route)
-        .unwrap();
+    let route = format!("wss://{}:{}/_user/connect", SERVER_ADDRESS, SERVER_PORT);
+    let mut root_store = RootCertStore::empty();
+    let cert = rustls_pemfile::read_one_from_slice(SERVER_CERTIFICATE).unwrap().unwrap().0;
+    let cert = match cert {
+        rustls_pemfile::Item::X509Certificate(v) => v,
+        _ => panic!("Invalid CA certificate format"),
+    };
+    root_store.add(cert).unwrap();
+    let config = Arc::new(ClientConfig::builder().with_root_certificates(root_store).with_no_client_auth());
+    let sock = TcpStream::connect(&format!("{}:{}", SERVER_ADDRESS, SERVER_PORT)).unwrap();
+    
+    let (client, _response) = tungstenite::client_tls_with_config(&route, sock, None, Some(tungstenite::Connector::Rustls(config))).unwrap();
+    if let MaybeTlsStream::Rustls(stream) = client.get_ref() {
+        //let _ = stream.set_nonblocking(true);
+        let _ = stream.sock.set_read_timeout(Some(Duration::from_secs_f32(0.2)));
+        let _ = stream.sock.set_write_timeout(Some(Duration::from_secs_f32(5.0)));
+    }
     println!("Connected to: {}", SERVER_ADDRESS);
     read_commands(client);
 }
 
-fn process_message(client: &mut WebSocket<MaybeTlsStream<TcpStream>>) -> Result<UserActionResponse, tungstenite::Error> {
+fn process_message(client: &mut WsClient) -> Result<UserActionResponse, tungstenite::Error> {
     let msg = match client.read() {
         Ok(v) => v,
         Err(e) => match e {
@@ -44,7 +63,7 @@ fn process_message(client: &mut WebSocket<MaybeTlsStream<TcpStream>>) -> Result<
 
 
 fn send_message(
-    client: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    client: &mut WsClient,
     receiver: &Receiver<tungstenite::Message>,
 ) -> Result<(), tungstenite::Error> {
     if let Ok(msg) = receiver.recv_timeout(std::time::Duration::from_secs_f32(1.0)) {
@@ -53,7 +72,7 @@ fn send_message(
     Ok(())
 }
 
-fn read_commands(mut client: WebSocket<MaybeTlsStream<TcpStream>>) {
+fn read_commands(mut client: WsClient) {
     let commands = [
         "help",
         "create-scenario",
@@ -64,6 +83,7 @@ fn read_commands(mut client: WebSocket<MaybeTlsStream<TcpStream>>) {
         "list-test-scenarios",
         "logs",
         "backup",
+        "report",
         "exit",
     ];
     let mut history = BasicHistory::new().max_entries(16).no_duplicates(true);
@@ -99,13 +119,14 @@ fn print_help() {
     println!("list-scenarios: List all file scenarios");
     println!("list-test-scenarios: List all testing scenarios");
     println!("backup: Saves the server state to disk");
+    println!("report: Generates a markdown report");
     println!("exit: exits the cli");
 }
 
 fn to_ws_message(
     command: &str,
     history: &mut BasicHistory,
-    client: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    client: &mut WsClient,
 ) -> Option<tungstenite::Message> {
     if command == "help" {
         print_help();
@@ -147,6 +168,24 @@ fn to_ws_message(
                 .unwrap();
             UserAction::BackupDB(backup)
         },
+        "report" => {
+            client.send(user_action_to_message(&UserAction::Report)).unwrap();
+            let msg = process_message(client).unwrap();
+            if let UserActionResponse::Report(rprt) = msg {
+                let report = Input::<String>::new()
+                    .with_prompt("Save report as")
+                    .history_with(history)
+                    .interact_text()
+                    .unwrap();
+                let file_name = format!("report-{}.md", report);
+                let mut file = std::fs::File::create(&file_name).unwrap();
+                file.write_all(rprt.report.as_bytes()).unwrap();
+                println!("Report {} saved to {}", rprt.id, file_name);
+            }else {
+                println!("{:?}", msg);
+            }
+            return None
+        },
         "logs" => {
             listen_to_logs(client);
             return None;
@@ -156,7 +195,7 @@ fn to_ws_message(
     Some(user_action_to_message(&msg))
 }
 
-fn listen_to_logs(client: &mut WebSocket<MaybeTlsStream<TcpStream>>) {
+fn listen_to_logs(client: &mut WsClient) {
     client.send(user_action_to_message(&UserAction::Logs)).unwrap();
     let run = Arc::new(AtomicBool::new(true));
     let thd = std::thread::spawn(|| {

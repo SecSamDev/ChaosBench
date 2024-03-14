@@ -5,18 +5,18 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
-actix-web = { version = "4", features = ["rustls"] }
+actix-web = { version = "4", features = ["rustls-0_22"] }
 tokio = { version = "1", features = ["rt", "macros", "sync", "rt-multi-thread", "fs"]}
 serde = { version = "1", features = ["derive"]}
 serde_json = { version = "1" }
 serde_yaml = {workspace = true}
 chaos-core = { path = "../common" }
-async-trait = "0.1.77"
 actix-web-actors = "4.2.0"
 actix = "0.13.1"
 env_logger = "0.11.0"
 log = "0.4"
 actix-files = "0.6.5"
-
-
-
+rhai = "1.17.1"
+reqwest = { workspace = true }
+rustls = { workspace = true }
+rustls-pemfile = { workspace = true }

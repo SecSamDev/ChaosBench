@@ -1,10 +1,10 @@
-use actix_web::{Responder, HttpResponse, web::{Json, Data, self}, HttpRequest};
+use actix_web::{Responder, web::{Data, self}, HttpRequest};
 use actix_web_actors::ws;
 
-use crate::{actors::{self, user::UserConnection}, state::ServerState};
+use crate::{actors::user::UserConnection, state::ServerState};
 
 pub fn user_config(cfg : &mut web::ServiceConfig) {
-    cfg.service(web::resource("/user/connect").
+    cfg.service(web::resource("/_user/connect").
         route(web::get().to(connect_user)));
 }
 

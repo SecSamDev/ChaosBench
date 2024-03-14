@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use serde::{Serialize, Deserialize, Deserializer};
+use serde::{Serialize, Deserialize};
 
-use crate::{action::{CustomAction, TestActionType}, common::*, parameters::{ScenarioParameters, TestParameters}, phase::TestPhase, variables::{ScenarioVariables, TestVariables}};
+use crate::{action::{CustomAction, TestActionType}, common::*, parameters::ScenarioParameters, variables::ScenarioVariables};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct TestScene {

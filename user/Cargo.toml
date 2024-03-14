@@ -11,3 +11,5 @@ chaos-core = { "path" = "../common" }
 tungstenite = {workspace = true}
 serde_json = {workspace = true}
 dialoguer = {version = "0.11", features = ["history", "completion"]}
+rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
