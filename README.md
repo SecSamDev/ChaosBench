@@ -168,6 +168,16 @@ SERVER_ADDRESS = "security.com"
 xtask = "run --package xtask --"
 ```
 
+The certificate and keys can be generated with:
+
+```
+openssl genrsa -out myCA.key 2048
+openssl req -x509 -new -nodes -key myCA.key -sha256 -days 10000 -out myCA.pem -subj "/C=ES/ST=Madrid/L=Madrid/O=SecSamDev/OU=Central/CN=secsamdev.com/emailAddress=samuel.garces@protonmail.com"
+openssl genrsa -out key.key 2048
+openssl req -new -key key.key -out test_server.csr -subj "/C=ES/ST=Madrid/L=Madrid/O=SecSamDev/OU=Security/CN=security.secsamdev.com/emailAddress=samuel.garces@protonmail.com"
+openssl x509 -req -in test_server.csr -CA myCA.pem -CAkey myCA.key -CAcreateserial -out certs.crt -days 10000 -sha256 -extfile test_server.ext
+```
+
 ### Build Agent
 This only builds the agent, not the installer. To use as a standalon executable for testing:
 
