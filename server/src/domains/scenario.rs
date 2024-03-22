@@ -33,6 +33,7 @@ impl From<&TestScenario> for CalculatedScenario {
                 action : action.clone(),
                 agent : String::new(),
                 id : tasks.len() as u32,
+                preparation : true,
                 limit : test.scene_preparation.phase_timeout.as_millis() as i64,
                 parameters : TestParameters::new()
             })
@@ -70,6 +71,7 @@ fn phase_to_tasks(phase : &TestActionType, scene_id : u32, scene : &TestScene, _
         action : phase.clone(),
         agent : String::new(),
         id : tasks.len() as u32,
+        preparation : false,
         limit : scene.phase_timeout.as_millis() as i64,
         parameters : TestParameters::new()
     });
@@ -82,6 +84,7 @@ fn scene_preparation(preps : &ScenePreparationActions, scene_id : u32, scene : &
             action : action.clone(),
             agent : String::new(),
             id : tasks.len() as u32,
+            preparation : true,
             limit : scene.phase_timeout.as_millis() as i64,
             parameters : TestParameters::new()
         })

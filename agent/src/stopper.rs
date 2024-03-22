@@ -129,6 +129,13 @@ fn on_start_service(state : &mut AgentState, client : &mut WsClient) -> Option<b
 }
 
 fn send_logs(state : &mut AgentState, client : &mut WsClient) -> Result<(), tungstenite::Error> {
+    loop {
+        let log = match state.try_recv_app_log() {
+            Some(v) => v,
+            None => break
+        };
+        client.send(agent_request_to_message(&AgentRequest::AppLog(log)))?;
+    }
     let mut c = 0;
     loop {
         if c > 5 {

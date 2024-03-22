@@ -2,12 +2,15 @@ use serde::{Serialize, Deserialize};
 
 use crate::err::ChaosResult;
 
-use super::{Log, TestingReport};
+use super::{agent::AppLog, Log, TestingReport};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum UserAction {
     BackupDB(String),
-    Logs,
+    AgentLogsAll,
+    AgentLogs(LogSubscription),
+    AppLogsAll,
+    AppLogs(LogSubscription),
     NoLogs,
     StartScenario(String),
     StopScenario(String),
@@ -25,8 +28,14 @@ pub struct CreateScenario {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct LogSubscription {
+    pub agent : String
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum UserActionResponse {
     Logs(Log),
+    AppLogs(AppLog),
     BackupDB(ChaosResult<()>),
     StartScenario(ChaosResult<()>),
     StopScenario(ChaosResult<()>),

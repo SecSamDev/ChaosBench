@@ -6,7 +6,7 @@ use actix::{
 use actix_web_actors::ws;
 use chaos_core::api::{agent::{AgentRequest, AgentResponse}, Log};
 
-use crate::{domains::connection::AgentLog, state::ServerState};
+use crate::{domains::connection::{AgentAppLog, AgentLog}, state::ServerState};
 
 use super::logs::LogServer;
 pub struct AgentConnection {
@@ -23,11 +23,17 @@ impl Actor for AgentConnection {
 
 impl AgentConnection {
     pub fn new(id: String, state : ServerState) -> Self {
-        let log = std::fs::File::options().append(true).write(true).truncate(false).open(format!("agent-{}.log", id)).ok();
+        let log = std::fs::File::options().append(true).write(true).truncate(false).create(true).open(format!("agent-{}.log", id)).ok();
         Self { addr : state.log_server.clone(), id, state, log }
     }
     fn write_log_to_file(&mut self, log : &str) {
         if let Some(file) = &mut self.log {
+            let _ = file.write_all(log.as_bytes());
+        }
+    }
+    fn write_app_log_to_file(&mut self, task : u32, app: &str, log : &str) {
+        let app_log = std::fs::File::options().append(true).write(true).truncate(false).create(true).open(format!("agent-{}-task-{}-app-{}.log", self.id, task, app)).ok();
+        if let Some(mut file) = app_log {
             let _ = file.write_all(log.as_bytes());
         }
     }
@@ -44,6 +50,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for AgentConnection {
                 return;
             }
         };
+        let task_id = match self.state.services.get_next_task_for_agent(&self.id) {
+            Some(v) => v.id,
+            None => return
+        };
         let data = match data {
             Some(v) => v,
             None => return,
@@ -55,6 +65,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for AgentConnection {
                     agent : self.id.clone(),
                     msg : log
                 }));
+            },
+            AgentRequest::AppLog(log) => {
+                self.write_app_log_to_file(task_id, &log.file, &log.msg);
+                self.addr.do_send(AgentAppLog(log));
             },
             AgentRequest::CompleteTask(task) => {
                 self.state.services.set_task_as_executed(task);

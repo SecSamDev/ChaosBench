@@ -6,6 +6,8 @@ pub mod installation;
 pub mod service;
 pub mod machine;
 pub mod workspace;
+pub mod watchlog;
+pub mod wait;
 
 /// Ejecutar una acción que viene desde el servidor, la idea es que esto produzca un TaskResult que se pueda enviar de vuelta al servidor
 /// Además es necesario guardar el estado de la operación en una bbdd local, así como también la sobreescritura de acciones.
@@ -53,6 +55,9 @@ pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, t
         TestActionType::Null => Ok(()),
         TestActionType::HttpRequest => Ok(()),
         TestActionType::HttpResponse => Ok(()),
+        TestActionType::Wait => wait::wait_agent(&parameters),
+        TestActionType::WatchLog => watchlog::start_listening_to_file_changes(&parameters, state),
+        TestActionType::WatchLogStop => watchlog::stop_listening_to_file_changes(&parameters),
         TestActionType::Custom(action) => Err(chaos_core::err::ChaosError::Other(format!("Custom action {} not found", action))),
     };
     task.result = Some(res);

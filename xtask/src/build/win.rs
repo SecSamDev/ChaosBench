@@ -10,7 +10,15 @@ static USER_BINARIES : [&'static str; 1] = ["user.exe"];
 
 
 pub fn build_full(params : BuildParameters) {
-    todo!("Still in progress")
+    let mut a_params = params.clone();
+    a_params.target_dir = PathBuf::from(&params.target_dir).join("Agent").to_string_lossy().to_string();
+    build_agent(a_params);
+    let mut s_params = params.clone();
+    s_params.target_dir = PathBuf::from(&params.target_dir).join("Server").to_string_lossy().to_string();
+    build_server(s_params.clone());
+    let mut u_params = params.clone();
+    u_params.target_dir = PathBuf::from(&params.target_dir).join("User").to_string_lossy().to_string();
+    build_user(u_params.clone());
 }
 
 pub fn build_server(params : BuildParameters) {

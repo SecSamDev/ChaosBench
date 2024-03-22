@@ -2,8 +2,6 @@ use serde::{Serialize, Deserialize};
 
 use crate::{action::CustomAction, parameters::ScenarioParameters, tasks::{AgentTask, AgentTaskResult}, variables::ScenarioVariables};
 
-use super::Log;
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ConnectAgent {
     pub id : String,
@@ -127,9 +125,9 @@ pub struct NextTaskForAgentRes {
     pub task : Option<AgentTask>
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct AgentLogReq {
-    pub log : Log,
-    pub agent : String
+pub struct AppLog {
+    pub msg : String,
+    pub file : String
 }
 
 /// Request from agent to server
@@ -137,6 +135,7 @@ pub struct AgentLogReq {
 pub enum AgentRequest {
     /// Agent uploads a log
     Log(String),
+    AppLog(AppLog),
     /// Agent asks for the next task. Requires the hash of the parameters + customactions
     NextTask(u64),
     /// Agent completes a task

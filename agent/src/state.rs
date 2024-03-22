@@ -1,7 +1,7 @@
 use std::{path::Path, sync::mpsc::{sync_channel, Receiver, SyncSender}, time::Duration};
 
-use chaos_core::
-    common::hash_params_and_actions
+use chaos_core::{api::agent::AppLog, 
+    common::hash_params_and_actions}
 ;
 
 use crate::{common::StopCommand, db::Database};
@@ -13,6 +13,8 @@ pub struct AgentState {
     pub db: Database,
     task_tries: u32,
     logs : Receiver<String>,
+    app_logs : Receiver<AppLog>,
+    app_logs_s : SyncSender<AppLog>,
     stopper : SyncSender<StopCommand>,
     log : Option<String>
 }
@@ -21,12 +23,15 @@ impl AgentState {
     pub fn new(stopper : SyncSender<StopCommand>) -> Self {
         let db = Database::load();
         let (_, logs) = sync_channel(1);
+        let (app_logs_s, app_logs) = sync_channel(1024);
         Self {
             db,
             task_tries: 0,
             logs,
             stopper,
-            log : None
+            log : None,
+            app_logs,
+            app_logs_s
         }
     }
     pub fn set_log_receiver(&mut self, logs : Receiver<String>) {
@@ -50,6 +55,12 @@ impl AgentState {
                 return tk;
             }
         }
+    }
+    pub fn try_recv_app_log(&mut self) -> Option<AppLog> {
+        self.app_logs.try_recv().ok()
+    }
+    pub fn app_log_sender(&mut self) -> SyncSender<AppLog> {
+        self.app_logs_s.clone()
     }
 
     pub fn increase_task_try(&mut self) -> u32 {

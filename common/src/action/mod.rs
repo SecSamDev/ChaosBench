@@ -12,6 +12,8 @@ use self::names::TASK_TIMEOUT;
 pub mod install;
 pub mod names;
 pub mod service;
+pub mod watchlog;
+pub mod wait;
 
 #[derive(Clone, Debug, Default, PartialEq, Hash)]
 pub enum TestActionType {
@@ -29,6 +31,8 @@ pub enum TestActionType {
     /// Checks that the service is running
     ServiceIsRunning,
     RestartHost,
+    /// Wait some time
+    Wait,
     Execute,
     /// Cleans the temporal folder associated with this test, not the real TMP folder
     CleanTmpFolder,
@@ -45,6 +49,10 @@ pub enum TestActionType {
     HttpResponse,
     /// Downloads a file
     Download,
+    /// Uploads all new lines of a text file
+    WatchLog,
+    /// Stops listening for changes in a text file    
+    WatchLogStop,
     #[default]
     Null,
     Custom(String),
@@ -61,6 +69,7 @@ impl<'a> From<&'a TestActionType> for &'a str {
     fn from(value: &TestActionType) -> &str {
         match value {
             TestActionType::Install => "Install",
+            TestActionType::Wait => "Wait",
             TestActionType::Uninstall => "Uninstall",
             TestActionType::InstallWithError => "InstallWithError",
             TestActionType::RestartService => "RestartService",
@@ -81,6 +90,8 @@ impl<'a> From<&'a TestActionType> for &'a str {
             TestActionType::Null => "Null",
             TestActionType::HttpRequest => "HttpRequest",
             TestActionType::HttpResponse => "HttpResponse",
+            TestActionType::WatchLog => "WatchLog",
+            TestActionType::WatchLogStop => "WatchLogStop",
             TestActionType::Custom(v) => v.as_str(),
         }
     }
@@ -156,6 +167,22 @@ pub fn get_timeout_field(parameters : &TestParameters) -> ChaosResult<Duration> 
     Ok(parameters
     .get(TASK_TIMEOUT)
     .ok_or(format!("Install parameter {:?} not found", TASK_TIMEOUT))?
+    .try_into()
+    .map_err(|_| "Invalid parameter type, expected String".to_string())?)
+}
+
+pub fn get_duration_field(parameters : &TestParameters, field : &str) -> ChaosResult<Duration> {
+    Ok(parameters
+    .get(field)
+    .ok_or(format!("Parameter {:?} not found", field))?
+    .try_into()
+    .map_err(|_| "Invalid parameter type, expected duration string".to_string())?)
+}
+
+pub fn get_string_field(parameters : &TestParameters, field : &str) -> ChaosResult<String> {
+    Ok(parameters
+    .get(field)
+    .ok_or(format!("Parameter {:?} not found", field))?
     .try_into()
     .map_err(|_| "Invalid parameter type, expected String".to_string())?)
 }

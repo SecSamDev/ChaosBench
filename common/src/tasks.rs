@@ -8,6 +8,7 @@ pub struct AgentTask {
     pub scene_id : u32,
     pub agent : String,
     pub limit : i64,
+    pub preparation : bool,
     pub action : TestActionType,
     pub parameters : TestParameters
 }

@@ -196,7 +196,7 @@ fn to_ws_message(
 }
 
 fn listen_to_logs(client: &mut WsClient) {
-    client.send(user_action_to_message(&UserAction::Logs)).unwrap();
+    client.send(user_action_to_message(&UserAction::AgentLogsAll)).unwrap();
     let run = Arc::new(AtomicBool::new(true));
     let thd = std::thread::spawn(|| {
         loop {
@@ -213,7 +213,10 @@ fn listen_to_logs(client: &mut WsClient) {
         if !run.load(std::sync::atomic::Ordering::Relaxed) {
             break;
         }
-        let msg = process_message(client).unwrap();
+        let msg = match process_message(client) {
+            Ok(v) => v,
+            Err(_) => continue
+        };
         if let UserActionResponse::Logs(log) = msg {
             println!("{} - {}", log.agent, log.msg.trim());
         }else {
