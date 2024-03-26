@@ -1,45 +1,673 @@
 use std::{
-    io::Write,
-    net::TcpStream,
-    sync::{
-        atomic::AtomicBool,
-        mpsc::Receiver,
-        Arc,
-    },
-    time::Duration,
+    collections::LinkedList, io::{stdout, Write}, net::TcpStream, sync::Arc, time::Duration
 };
 
-use chaos_core::api::user_actions::{CreateScenario, UserAction, UserActionResponse};
-use dialoguer::{BasicHistory, Input, Select};
+use std::io;
+
+use crossterm::{
+    event::{self, Event, KeyCode},
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
+};
+use ratatui::{
+    prelude::*,
+    widgets::{block::*, *},
+};
+
+use chaos_core::{api::user_actions::{CreateScenario, UserAction, UserActionResponse}, err::ChaosResult};
 use rustls::{ClientConfig, RootCertStore};
 use tungstenite::{stream::MaybeTlsStream, WebSocket};
 
 const SERVER_ADDRESS: &str = env!("SERVER_ADDRESS");
 const SERVER_PORT: &str = env!("SERVER_PORT");
-pub const SERVER_CERTIFICATE : &[u8] = include_bytes!(env!("CA_CERT"));
+pub const SERVER_CERTIFICATE: &[u8] = include_bytes!(env!("CA_CERT"));
+
+#[derive(PartialEq, Eq, Default)]
+pub enum SelectedWindow {
+    #[default]
+    Commands,
+    AgentLogs,
+    AppLogs
+}
+
+pub struct UserApp {
+    pub position : usize,
+    pub agent_logs_i : usize,
+    pub app_logs_i : usize,
+    pub exit: bool,
+    pub client : WsClient,
+    pub app_logs : LinkedList<[String; 2]>,
+    pub agent_logs : LinkedList<[String; 2]>,
+    pub output : LinkedList<String>,
+    pub input : bool,
+    pub input_text : String,
+    pub command_state : CommandState,
+    pub window : SelectedWindow,
+    pub current_agent_completion : (u32, u32)
+}
+pub enum CommandState {
+    None,
+    CreateScenario(CreateScenarioState),
+    StartScenario(SelectScenarioState),
+    StopScenario(SelectScenarioState),
+    Backup(BackupName),
+}
+#[derive(Default)]
+pub struct CreateScenarioState {
+    pub id : Option<String>,
+    pub base_id : Option<String>
+}
+#[derive(Default)]
+pub struct SelectScenarioState {
+    pub id : Option<String>
+}
+#[derive(Default)]
+pub struct BackupName {
+    pub name : Option<String>
+}
 
 type WsClient = WebSocket<MaybeTlsStream<TcpStream>>;
 
-fn main() {
+const COMMAND_LIST : &[[&str; 2]] = &[["Agent logs", "Shows an agent logs"],
+["Stop agent logs", "Stops receiving agent logs"],
+["App logs", "Shows app logs of an agent"],
+["Stop app logs", "Stops receiving app logs"],
+["Create scenario", "Creates a new testing scenario"],
+["Start scenario", "Starts a testing scenario"],
+["Stop scenario", "Stops a testing scenario"],
+["Edit scenario", "Edit parameters of scenario"],
+["List scenarios", "List all file scenario"],
+["List test scenarios", "List all testing scenarios"],
+["Backup", "Saves the server state"],
+["Report", "Generates a markdown report"],
+["Exit", "Exists the interface"]];
+
+const ASCII_ART: &str = r#"
+______________                     ________                  ______  
+__  ____/__  /_______ ________________  __ )____________________  /_ 
+_  /    __  __ \  __ `/  __ \_  ___/_  __  |  _ \_  __ \  ___/_  __ \
+/ /___  _  / / / /_/ // /_/ /(__  )_  /_/ //  __/  / / / /__ _  / / /
+\____/  /_/ /_/\__,_/ \____//____/ /_____/ \___//_/ /_/\___/ /_/ /_/ 
+"#;
+
+fn main() -> io::Result<()> {
     let route = format!("wss://{}:{}/_user/connect", SERVER_ADDRESS, SERVER_PORT);
     let mut root_store = RootCertStore::empty();
-    let cert = rustls_pemfile::read_one_from_slice(SERVER_CERTIFICATE).unwrap().unwrap().0;
+    let cert = rustls_pemfile::read_one_from_slice(SERVER_CERTIFICATE)
+        .unwrap()
+        .unwrap()
+        .0;
     let cert = match cert {
         rustls_pemfile::Item::X509Certificate(v) => v,
         _ => panic!("Invalid CA certificate format"),
     };
     root_store.add(cert).unwrap();
-    let config = Arc::new(ClientConfig::builder().with_root_certificates(root_store).with_no_client_auth());
+    let config = Arc::new(
+        ClientConfig::builder()
+            .with_root_certificates(root_store)
+            .with_no_client_auth(),
+    );
     let sock = TcpStream::connect(&format!("{}:{}", SERVER_ADDRESS, SERVER_PORT)).unwrap();
-    
-    let (client, _response) = tungstenite::client_tls_with_config(&route, sock, None, Some(tungstenite::Connector::Rustls(config))).unwrap();
+
+    let (client, _response) = tungstenite::client_tls_with_config(
+        &route,
+        sock,
+        None,
+        Some(tungstenite::Connector::Rustls(config)),
+    )
+    .unwrap();
     if let MaybeTlsStream::Rustls(stream) = client.get_ref() {
         //let _ = stream.set_nonblocking(true);
-        let _ = stream.sock.set_read_timeout(Some(Duration::from_secs_f32(0.2)));
-        let _ = stream.sock.set_write_timeout(Some(Duration::from_secs_f32(5.0)));
+        let _ = stream
+            .sock
+            .set_read_timeout(Some(Duration::from_secs_f32(0.1)));
+        let _ = stream
+            .sock
+            .set_write_timeout(Some(Duration::from_secs_f32(2.0)));
     }
-    println!("Connected to: {}", SERVER_ADDRESS);
-    read_commands(client);
+    enable_raw_mode()?;
+    stdout().execute(EnterAlternateScreen)?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
+    let mut app = UserApp::new(client);
+    app.run(&mut terminal)?;
+    disable_raw_mode()?;
+    stdout().execute(LeaveAlternateScreen)?;
+    Ok(())
+}
+
+impl UserApp {
+    pub fn new(client : WsClient) -> Self {
+        Self {
+            exit : false,
+            position : 0,
+            client,
+            app_logs : LinkedList::new(),
+            agent_logs : LinkedList::new(),
+            output : LinkedList::new(),
+            input : false,
+            input_text : String::with_capacity(32),
+            command_state : CommandState::None,
+            window : SelectedWindow::Commands,
+            agent_logs_i : 0,
+            app_logs_i : 0,
+            current_agent_completion : (0, 0)
+        }
+    }
+    /// runs the application's main loop until the user quits
+    pub fn run<B : Backend>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()> {
+        while !self.exit {
+            terminal.draw(|frame| self.render_frame(frame))?;
+            self.handle_events()?;
+        }
+        Ok(())
+    }
+
+    fn render_frame(&self, frame: &mut Frame) {
+        let mut pos = 0;
+        let commands = COMMAND_LIST.iter().map(|v| {
+            let mut row = Row::new(*v).white();
+            if pos == self.position {
+                row = row.light_yellow();
+            }
+            pos += 1;
+            row
+        });
+        let output_rows = self.output.iter().map(|v| Row::new(vec![v.as_str()]));
+        let output_rows = ConsoleIterator::new(output_rows, if self.input {
+            Some(Row::new(vec![self.input_text.as_str()]).white())
+        }else {
+            None
+        });
+        let app_rows = self.app_logs.iter().skip(self.app_logs_i).map(|v| Row::new(vec![v[0].as_str(), v[1].as_str()]).white());
+        let agent_rows = self.agent_logs.iter().skip(self.agent_logs_i).map(|v| Row::new(vec![v[0].as_str(), v[1].as_str()]).white());
+        let main_layout = Layout::new(
+            Direction::Horizontal,
+            [Constraint::Percentage(30), Constraint::Percentage(70)],
+        )
+        .split(frame.size());
+        let left_pannel = Layout::new(
+            Direction::Vertical,
+            [Constraint::Percentage(50), Constraint::Percentage(50)],
+        )
+        .split(main_layout[0]);
+        frame.render_widget(
+            if self.window == SelectedWindow::Commands {
+                Table::new(commands, [Constraint::Min(20),Constraint::Percentage(100)]).block(Block::bordered().style(border_style()).blue())
+            }else {
+                Table::new(commands, [Constraint::Min(20),Constraint::Percentage(100)]).block(Block::bordered().style(border_style()))
+            },
+            left_pannel[0],
+        );
+        frame.render_widget(
+            Table::new(output_rows, [Constraint::Percentage(100)]).block(Block::bordered().style(border_style())),
+            left_pannel[1],
+        );
+        let right_pannel = Layout::new(
+            Direction::Vertical,
+            [Constraint::Min(7), Constraint::Percentage(100)],
+        )
+        .split(main_layout[1]);
+        let right_pannel_bottom = Layout::new(
+            Direction::Vertical,
+            [Constraint::Percentage(50), Constraint::Percentage(50)],
+        )
+        .split(right_pannel[1]);
+        frame.render_widget(
+            Paragraph::new(ASCII_ART.trim()).block(Block::default().set_style(border_style()).borders(Borders::ALL)),
+            right_pannel[0],
+        );
+        frame.render_widget(
+            if self.window == SelectedWindow::AgentLogs {
+                Table::new(agent_rows, [Constraint::Max(10), Constraint::Percentage(100)]).block(Block::bordered().style(border_style()).borders(Borders::ALL).title("Agent Logs").title_bottom(format!("{}/{}", self.current_agent_completion.0, self.current_agent_completion.1)).blue())
+            }else {
+                Table::new(agent_rows, [Constraint::Max(10), Constraint::Percentage(100)]).block(Block::bordered().style(border_style()).borders(Borders::ALL).title("Agent Logs").title_bottom(format!("{}/{}", self.current_agent_completion.0, self.current_agent_completion.1)))
+            },
+            right_pannel_bottom[0],
+        );
+        frame.render_widget(
+            if self.window == SelectedWindow::AppLogs {
+                Table::new(app_rows, [Constraint::Max(10), Constraint::Percentage(100)]).block(Block::bordered().style(border_style()).borders(Borders::ALL).title("App Logs").blue())
+            }else {
+                Table::new(app_rows, [Constraint::Max(10), Constraint::Percentage(100)]).block(Block::bordered().style(border_style()).borders(Borders::ALL).title("App Logs"))
+            },
+            right_pannel_bottom[1],
+        );
+    }
+
+    fn handle_events_commands(&mut self) -> io::Result<()> {
+        self.check_executed_command();
+        if event::poll(std::time::Duration::from_millis(50))? {
+            if let Event::Key(key) = event::read()? {
+                if key.kind == event::KeyEventKind::Press {
+                    if self.input {
+                        if key.code == KeyCode::Backspace {
+                            self.input_text.pop();
+                        }else if key.code == KeyCode::Enter {
+                            self.input = false;
+                        }else {
+                            if let KeyCode::Char(c) = key.code {
+                                self.input_text.push(c);
+                            }
+                        }
+                    }else {
+                        if key.code == KeyCode::Char('q') {
+                            self.exit = true;
+                            return Ok(());
+                        }else if key.code == KeyCode::Up {
+                            if self.position > 0 {
+                                self.position -= 1;
+                            }else {
+                                self.position = COMMAND_LIST.len() - 1;
+                            }
+                        }else if key.code == KeyCode::Down {
+                            self.position += 1;
+                            if self.position >= COMMAND_LIST.len() {
+                                self.position = 0;
+                            }
+                        } else if key.code == KeyCode::Left {
+                            self.left_window();
+                        }else if key.code == KeyCode::Right {
+                            self.right_window();
+                        } else if key.code == KeyCode::Enter {
+                            self.execute_command();
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn left_window(&mut self) {
+        let nw = match self.window {
+            SelectedWindow::Commands => SelectedWindow::AppLogs,
+            SelectedWindow::AgentLogs => SelectedWindow::Commands,
+            SelectedWindow::AppLogs => SelectedWindow::AgentLogs,
+        };
+        self.window = nw;
+    }
+    fn right_window(&mut self) {
+        let nw = match self.window {
+            SelectedWindow::Commands => SelectedWindow::AgentLogs,
+            SelectedWindow::AgentLogs => SelectedWindow::AppLogs,
+            SelectedWindow::AppLogs => SelectedWindow::Commands,
+        };
+        self.window = nw;
+    }
+
+    fn handle_events_agent_logs(&mut self) -> io::Result<()> {
+        if event::poll(std::time::Duration::from_millis(50))? {
+            if let Event::Key(key) = event::read()? {
+                if key.kind == event::KeyEventKind::Press {
+                    if key.code == KeyCode::Up {
+                        if self.agent_logs_i > 0 {
+                            self.agent_logs_i -= 1;
+                        }else {
+                            self.agent_logs_i = self.agent_logs.len().saturating_sub(1);
+                        }
+                    }else if key.code == KeyCode::Down {
+                        self.agent_logs_i = self.agent_logs_i.saturating_add(1);
+                        if self.agent_logs_i >= self.agent_logs.len() {
+                            self.agent_logs_i = 0;
+                        }
+                    } else if key.code == KeyCode::Left {
+                        self.left_window();
+                    }else if key.code == KeyCode::Right {
+                        self.right_window();
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn handle_events_app_logs(&mut self) -> io::Result<()> {
+        if event::poll(std::time::Duration::from_millis(50))? {
+            if let Event::Key(key) = event::read()? {
+                if key.kind == event::KeyEventKind::Press {
+                    if key.code == KeyCode::Up {
+                        if self.app_logs_i > 0 {
+                            self.app_logs_i -= 1;
+                        }else {
+                            self.app_logs_i = self.app_logs.len().saturating_sub(1);
+                        }
+                    }else if key.code == KeyCode::Down {
+                        self.app_logs_i += 1;
+                        if self.app_logs_i >= self.app_logs.len() {
+                            self.app_logs_i = 0;
+                        }
+                    } else if key.code == KeyCode::Left {
+                        self.left_window();
+                    }else if key.code == KeyCode::Right {
+                        self.right_window();
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn handle_events(&mut self) -> io::Result<()> {
+        match self.window {
+            SelectedWindow::Commands => self.handle_events_commands()?,
+            SelectedWindow::AgentLogs => self.handle_events_agent_logs()?,
+            SelectedWindow::AppLogs => self.handle_events_app_logs()?,
+        };
+        self.receive_data();
+        Ok(())
+    }
+    fn get_input_text(&mut self) -> String {
+        let mut ret = String::with_capacity(32);
+        std::mem::swap(&mut self.input_text, &mut ret);
+        ret
+    }
+    fn check_executed_command(&mut self) {
+        if self.input {
+            return
+        }
+        let txt = self.get_input_text();
+        let mut completed = false;
+        let mut to_show = Vec::with_capacity(8);
+        match &mut self.command_state {
+            CommandState::None => return,
+            CommandState::CreateScenario(ls) => {
+                if ls.id.is_none() {
+                    to_show.push(txt.clone());
+                    ls.id = Some(txt);
+                    to_show.push("Base scenario ID?".into());
+                    self.input = true;
+                } else if ls.base_id.is_none() {
+                    to_show.push(txt.clone());
+                    ls.base_id = Some(txt);
+                }
+                if ls.id.is_some() && ls.base_id.is_some() {
+                    completed = true
+                }
+            },
+            CommandState::StartScenario(ss) => {
+                if ss.id.is_none() {
+                    to_show.push(txt.clone());
+                    ss.id = Some(txt);
+                }
+                completed = true;
+            },
+            CommandState::StopScenario(ss) => {
+                if ss.id.is_none() {
+                    to_show.push(txt.clone());
+                    ss.id = Some(txt);
+                }
+                completed = true;
+            },
+            CommandState::Backup(b) => {
+                if b.name.is_none() {
+                    to_show.push(txt.clone());
+                    b.name = Some(txt);
+                }
+                completed = true;
+            }
+        }
+        for txt in to_show {
+            self.show_text(txt);
+        }
+        if completed {
+            let mut cs = CommandState::None;
+            std::mem::swap(&mut self.command_state, &mut cs);
+            match cs {
+                CommandState::None => return,
+                CommandState::CreateScenario(ls) => {
+                    self.create_sceanario(ls.id.unwrap(), ls.base_id.unwrap())
+                },
+                CommandState::StartScenario(ss) => {
+                    self.start_sceanario(ss.id.unwrap())
+                },
+                CommandState::StopScenario(ss) => {
+                    self.stop_sceanario(ss.id.unwrap())
+                },
+                CommandState::Backup(v) => {
+                    self.do_backup(v.name.unwrap());
+                }
+            }
+
+        }
+    }
+
+    fn execute_command(&mut self) {
+        let cmd = match COMMAND_LIST.get(self.position) {
+            Some(v) => v[0],
+            None => return
+        };
+        match cmd {
+            "Agent logs" => {
+                self.start_agent_logs();
+            },
+            "Stop agent logs" => {
+                self.stop_agent_logs();
+            },
+            "App logs" => {
+                self.start_app_logs();
+            },
+            "Stop app logs" => {
+                self.stop_app_logs();
+            },
+            "Create scenario" => {
+                self.init_creating_scenario();
+            },
+            "Start scenario" => {
+                self.init_start_scenario();
+            },
+            "Stop scenario" => {
+                self.init_stop_scenario();
+            },
+            "Edit scenario" => {
+                
+            },
+            "List scenarios" => {
+                self.list_scenarios();
+            },
+            "List test scenarios" => {
+                self.list_test_scenarios();
+            },
+            "Backup" => {
+                self.init_backup();
+            },
+            "Report" => {
+
+            },
+            "Exit" => {
+                self.exit = true;
+            },
+            _ => {}
+        }
+    }
+    fn show_text(&mut self, text : String) {
+        self.output.push_front(text);
+        if self.output.len() > 1024 {
+            for _ in 0..(self.output.len() - 1024) {
+                self.output.pop_back();
+            }
+        }
+    }
+    fn show_agent_log(&mut self, text : [String; 2]) {
+        self.agent_logs.push_front(text);
+        if self.agent_logs.len() > 1024 {
+            for _ in 0..(self.agent_logs.len() - 1024) {
+                self.agent_logs.pop_back();
+            }
+        }
+    }
+    fn show_app_log(&mut self, text : [String; 2]) {
+        self.app_logs.push_front(text);
+        if self.app_logs.len() > 1024 {
+            for _ in 0..(self.app_logs.len() - 1024) {
+                self.app_logs.pop_back();
+            }
+        }
+    }
+
+    fn receive_data(&mut self) {
+        loop {
+            let msg = match process_message(&mut self.client) {
+                Ok(v) => v,
+                Err(_) => break,
+            };
+            match msg {
+                UserActionResponse::Logs(v) => {
+                    self.show_agent_log([v.agent, v.msg]);
+                    return;
+                },
+                UserActionResponse::AgentCompletion(v) => {
+                    self.current_agent_completion = v;
+                },
+                UserActionResponse::AppLogs(v) => {
+                    self.show_app_log([v.file, v.msg]);
+                    return
+                },
+                UserActionResponse::BackupDB(v) => {
+                    self.show_text(format!("Server Backup status {}", result_to_string(v)));
+                },
+                UserActionResponse::StartScenario(v) => {
+                    self.show_text(format!("Start scenario {}", result_to_string(v)));
+                },
+                UserActionResponse::StopScenario(v) => {
+                    self.show_text(format!("Stop scenario {}", result_to_string(v)));
+                },
+                UserActionResponse::CreateScenario(v) => {
+                    self.show_text(format!("Create scenario {}", result_to_string(v)));
+                },
+                UserActionResponse::EnumerateScenarios(v) => {
+                    for s in v {
+                        self.show_text(format!("- {}", s));
+                    }
+                    self.show_text("Scenarios:".into());
+                    return
+                },
+                UserActionResponse::EnumerateTestingScenarios(v) => {
+                    for s in v {
+                        self.show_text(format!("- {}", s));
+                    }
+                    self.show_text("Testing Scenarios:".into());
+                    return
+                },
+                UserActionResponse::Report(rprt) => {
+                    let file_name = format!("report-{}.md", rprt.id);
+                    let mut file = std::fs::File::create(&file_name).unwrap();
+                    file.write_all(rprt.report.as_bytes()).unwrap();
+                    self.show_text(format!("Generated report {}", file_name));
+                    return
+                },
+                UserActionResponse::None => return,
+            };
+
+        }
+    }
+
+    fn start_agent_logs(&mut self) {
+        self.client
+            .send(user_action_to_message(&UserAction::AgentLogsAll))
+            .unwrap();
+    }
+    fn stop_agent_logs(&mut self) {
+        self.client
+            .send(user_action_to_message(&UserAction::StopAgentLogs))
+            .unwrap();
+    }
+    fn start_app_logs(&mut self) {
+        self.client
+            .send(user_action_to_message(&UserAction::AppLogsAll))
+            .unwrap();
+    }
+    fn stop_app_logs(&mut self) {
+        self.client
+            .send(user_action_to_message(&UserAction::StopAppLogs))
+            .unwrap();
+    }
+    fn list_scenarios(&mut self) {
+        self.client
+            .send(user_action_to_message(&UserAction::EnumerateScenarios))
+            .unwrap();
+    }
+    fn list_test_scenarios(&mut self) {
+        self.client
+            .send(user_action_to_message(&UserAction::EnumerateTestingScenarios))
+            .unwrap();
+    }
+
+    fn init_creating_scenario(&mut self) {
+        self.input = true;
+        self.input_text.clear();
+        self.command_state = CommandState::CreateScenario(CreateScenarioState::default());
+        self.show_text("Scenario ID?".into());
+    }
+
+    fn create_sceanario(&mut self, id : String, base_id : String) {
+        self.client
+            .send(user_action_to_message(&UserAction::CreateScenario(CreateScenario {
+                base_id,
+                id
+            })))
+            .unwrap();
+    }
+    fn init_start_scenario(&mut self) {
+        self.input = true;
+        self.input_text.clear();
+        self.command_state = CommandState::StartScenario(SelectScenarioState::default());
+        self.show_text("Scenario ID?".into());
+    }
+    fn start_sceanario(&mut self, id : String) {
+        self.client
+            .send(user_action_to_message(&UserAction::StartScenario(id)))
+            .unwrap();
+    }
+    fn init_stop_scenario(&mut self) {
+        self.input = true;
+        self.input_text.clear();
+        self.command_state = CommandState::StopScenario(SelectScenarioState::default());
+        self.show_text("Scenario ID?".into());
+    }
+    fn stop_sceanario(&mut self, id : String) {
+        self.client
+            .send(user_action_to_message(&UserAction::StopScenario(id)))
+            .unwrap();
+    }
+    fn init_backup(&mut self) {
+        self.input = true;
+        self.input_text.clear();
+        self.command_state = CommandState::Backup(BackupName::default());
+        self.show_text("Backup name?".into());
+    }
+    fn do_backup(&mut self, name : String) {
+        self.client
+            .send(user_action_to_message(&UserAction::BackupDB(name)))
+            .unwrap();
+    }
+}
+
+
+fn border_style() -> Style {
+    Style::new().light_cyan()
+}
+
+struct ConsoleIterator<'a, I> where I: Iterator<Item = Row<'a>> {
+    iter : I,
+    element : Option<Row<'a>>
+}
+impl<'a, I> Iterator for ConsoleIterator<'a, I> where I: Iterator<Item = Row<'a>>{
+    type Item = Row<'a>;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.element.take() {
+            Some(v) => return Some(v),
+            None => {}
+        }
+        self.iter.next()
+    }
+}
+impl<'a, I> ConsoleIterator<'a, I> where I: Iterator<Item = Row<'a>> {
+    pub fn new(iter : I, element : Option<Row<'a>>) -> Self {
+        Self {
+            iter,
+            element
+        }
+    }
 }
 
 fn process_message(client: &mut WsClient) -> Result<UserActionResponse, tungstenite::Error> {
@@ -62,172 +690,13 @@ fn process_message(client: &mut WsClient) -> Result<UserActionResponse, tungsten
 }
 
 
-fn send_message(
-    client: &mut WsClient,
-    receiver: &Receiver<tungstenite::Message>,
-) -> Result<(), tungstenite::Error> {
-    if let Ok(msg) = receiver.recv_timeout(std::time::Duration::from_secs_f32(1.0)) {
-        client.send(msg).unwrap();
-    }
-    Ok(())
-}
-
-fn read_commands(mut client: WsClient) {
-    let commands = [
-        "help",
-        "create-scenario",
-        "start-scenario",
-        "stop-scenario",
-        "edit-scenario",
-        "list-scenarios",
-        "list-test-scenarios",
-        "logs",
-        "backup",
-        "report",
-        "exit",
-    ];
-    let mut history = BasicHistory::new().max_entries(16).no_duplicates(true);
-    loop {
-        let selection = Select::new()
-            .with_prompt("Execute a command")
-            .items(&commands)
-            .interact()
-            .unwrap();
-        let command = commands[selection];
-        if command == "exit" {
-            return;
-        }
-        let msg = to_ws_message(command, &mut history, &mut client);
-        let msg = match msg {
-            Some(v) => v,
-            None => continue,
-        };
-        client.send(msg).unwrap();
-        let msg = process_message(&mut client).unwrap();
-        println!("{:?}", msg);
-    }
-}
-
-fn print_help() {
-    println!("Commands: ");
-    println!("help: Shows this help");
-    println!("logs: Listen to logs");
-    println!("create-scenario: Creates a new testing scenario");
-    println!("start-scenario: Starts a testing scenario");
-    println!("stop-scenario: Stops a testing scenario");
-    println!("edit-scenario: Edit parameters of a testing scenario");
-    println!("list-scenarios: List all file scenarios");
-    println!("list-test-scenarios: List all testing scenarios");
-    println!("backup: Saves the server state to disk");
-    println!("report: Generates a markdown report");
-    println!("exit: exits the cli");
-}
-
-fn to_ws_message(
-    command: &str,
-    history: &mut BasicHistory,
-    client: &mut WsClient,
-) -> Option<tungstenite::Message> {
-    if command == "help" {
-        print_help();
-        return None;
-    }
-    let msg = match command {
-        "help" => {
-            print_help();
-            return None;
-        }
-        "start-scenario" => {
-            let scenario_id = Input::<String>::new()
-                .with_prompt("Scenario ID")
-                .history_with(history)
-                .interact_text()
-                .unwrap();
-            UserAction::StartScenario(scenario_id)
-        }
-        "list-scenarios" => UserAction::EnumerateScenarios,
-        "list-test-scenarios" => UserAction::EnumerateTestingScenarios,
-        "create-scenario" => {
-            let id = Input::<String>::new()
-                .with_prompt("Scenario ID")
-                .history_with(history)
-                .interact_text()
-                .unwrap();
-            let base_id = Input::<String>::new()
-                .with_prompt("Base scenario ID")
-                .history_with(history)
-                .interact_text()
-                .unwrap();
-            UserAction::CreateScenario(CreateScenario { base_id, id })
-        },
-        "backup" => {
-            let backup = Input::<String>::new()
-                .with_prompt("Backup name")
-                .history_with(history)
-                .interact_text()
-                .unwrap();
-            UserAction::BackupDB(backup)
-        },
-        "report" => {
-            client.send(user_action_to_message(&UserAction::Report)).unwrap();
-            let msg = process_message(client).unwrap();
-            if let UserActionResponse::Report(rprt) = msg {
-                let report = Input::<String>::new()
-                    .with_prompt("Save report as")
-                    .history_with(history)
-                    .interact_text()
-                    .unwrap();
-                let file_name = format!("report-{}.md", report);
-                let mut file = std::fs::File::create(&file_name).unwrap();
-                file.write_all(rprt.report.as_bytes()).unwrap();
-                println!("Report {} saved to {}", rprt.id, file_name);
-            }else {
-                println!("{:?}", msg);
-            }
-            return None
-        },
-        "logs" => {
-            listen_to_logs(client);
-            return None;
-        }
-        _ => return None,
-    };
-    Some(user_action_to_message(&msg))
-}
-
-fn listen_to_logs(client: &mut WsClient) {
-    client.send(user_action_to_message(&UserAction::AgentLogsAll)).unwrap();
-    let run = Arc::new(AtomicBool::new(true));
-    let thd = std::thread::spawn(|| {
-        loop {
-            let ext = Input::<String>::new()
-            .with_prompt("Type exit...")
-            .interact_text()
-            .unwrap();
-        if ext == "exit" {
-            break;
-        }
-        }
-    });
-    loop {
-        if !run.load(std::sync::atomic::Ordering::Relaxed) {
-            break;
-        }
-        let msg = match process_message(client) {
-            Ok(v) => v,
-            Err(_) => continue
-        };
-        if let UserActionResponse::Logs(log) = msg {
-            println!("{} - {}", log.agent, log.msg.trim());
-        }else {
-            println!("{:?}", msg);
-        }
-    }
-    let _ = thd.join();
-    client.send(user_action_to_message(&UserAction::NoLogs)).unwrap();
-}
-
-
-fn user_action_to_message(action : &UserAction) -> tungstenite::Message {
+fn user_action_to_message(action: &UserAction) -> tungstenite::Message {
     tungstenite::Message::Binary(serde_json::to_vec(action).unwrap())
+}
+
+fn result_to_string(r : ChaosResult<()>) -> String {
+    match r {
+        Ok(_) => "OK".into(),
+        Err(e) => format!("ERR: {}", e),
+    }
 }

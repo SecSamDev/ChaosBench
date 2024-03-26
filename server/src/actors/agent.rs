@@ -6,7 +6,7 @@ use actix::{
 use actix_web_actors::ws;
 use chaos_core::api::{agent::{AgentRequest, AgentResponse}, Log};
 
-use crate::{domains::connection::{AgentAppLog, AgentLog}, state::ServerState};
+use crate::{domains::connection::{AgentAppLog, AgentCompletionUpdate, AgentLog}, state::ServerState};
 
 use super::logs::LogServer;
 pub struct AgentConnection {
@@ -71,6 +71,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for AgentConnection {
                 self.addr.do_send(AgentAppLog(log));
             },
             AgentRequest::CompleteTask(task) => {
+                self.addr.do_send(AgentCompletionUpdate {
+                    agent : self.id.clone(),
+                    completed : task.id,
+                    total : self.state.services.total_tasks()
+                });
                 self.state.services.set_task_as_executed(task);
             },
             AgentRequest::HeartBeat => {},

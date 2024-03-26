@@ -33,6 +33,11 @@ impl ServerServices for ProductionService {
     }
     fn update_agent_task(&self, task: AgentTask) {}
 
+    fn total_tasks(&self) -> u32 {
+        let db = self.repo.db.lock().unwrap();
+        db.scenario.as_ref().map(|v| v.tasks.len() as u32).unwrap_or(u32::MAX).saturating_sub(1)
+    }
+
     fn get_next_task_for_agent(&self, agent: &str) -> Option<AgentTask> {
         let db = self.repo.db.lock().unwrap();
         let scenario = db.scenario.as_ref()?;

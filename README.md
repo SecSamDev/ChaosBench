@@ -2,6 +2,67 @@
 
 A simple tool for testing application packages across multiple platforms.
 
+```
+┌─────────────────────────────────────────────────────────────┐┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│Agent logs           Shows an agent logs                     ││______________                     ________                  ______                                                                             │
+│Stop agent logs      Stops receiving agent logs              ││__  ____/__  /_______ ________________  __ )____________________  /_                                                                            │
+│App logs             Shows app logs of an agent              ││_  /    __  __ \  __ `/  __ \_  ___/_  __  |  _ \_  __ \  ___/_  __ \                                                                           │
+│Stop app logs        Stops receiving app logs                ││/ /___  _  / / / /_/ // /_/ /(__  )_  /_/ //  __/  / / / /__ _  / / /                                                                           │
+│Create scenario      Creates a new testing scenario          ││\____/  /_/ /_/\__,_/ \____//____/ /_____/ \___//_/ /_/\___/ /_/ /_/                                                                            │
+│Start scenario       Starts a testing scenario               │└────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+│Stop scenario        Stops a testing scenario                │┌Agent Logs──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│Edit scenario        Edit parameters of scenario             ││ 2024-03-24 08:02:12 | main | INFO  | Sent completed task                                                                                       │
+│List scenarios       List all file scenario                  ││ 2024-03-24 08:02:12 | main | INFO  | Task to execute ID=37 Start=0 Limit=10000 TTL=-1711263722018                                              │
+│List test scenarios  List all testing scenarios              ││ 2024-03-24 08:02:11 | main | INFO  | NextTask(AgentTask { id: 37, scene_id: 3, agent: "bccbdf7d-093e-911b-a2c0-047c16c20e40", limit: 10000, pre│
+│Backup               Saves the server state                  ││ 2024-03-24 08:02:11 | main | INFO  | Sent completed task                                                                                       │
+│Report               Generates a markdown report             ││ 2024-03-24 08:02:11 | main | INFO  | Task to execute ID=36 Start=0 Limit=10000 TTL=-1711263721195                                              │
+│Exit                 Exists the interface                    ││ 2024-03-24 08:02:10 | main | INFO  | NextTask(AgentTask { id: 36, scene_id: 3, agent: "bccbdf7d-093e-911b-a2c0-047c16c20e40", limit: 10000, pre│
+│                                                             ││ 2024-03-24 08:02:10 | main | INFO  | Sent completed task                                                                                       │
+│                                                             ││ 2024-03-24 08:02:10 | main | INFO  | Task to execute ID=35 Start=0 Limit=10000 TTL=-1711263720340                                              │
+│                                                             ││ 2024-03-24 08:02:10 | main | INFO  | NextTask(AgentTask { id: 35, scene_id: 3, agent: "bccbdf7d-093e-911b-a2c0-047c16c20e40", limit: 10000, pre│
+│                                                             ││ 2024-03-24 08:02:09 | main | INFO  | Sent completed task                                                                                       │
+│                                                             ││ 2024-03-24 08:02:09 | main | INFO  | Task to execute ID=34 Start=0 Limit=30000 TTL=-1711263699522                                              │
+│                                                             ││ 2024-03-24 08:02:09 | main | INFO  | NextTask(AgentTask { id: 34, scene_id: 3, agent: "bccbdf7d-093e-911b-a2c0-047c16c20e40", limit: 30000, pre│
+│                                                             ││ 2024-03-24 08:02:08 | main | INFO  | Sent completed task                                                                                       │
+│                                                             ││ 2024-03-24 08:02:08 | main | INFO  | Task to execute ID=33 Start=0 Limit=30000 TTL=-1711263698697                                              │
+│                                                             ││ 2024-03-24 08:02:08 | main | INFO  | NextTask(AgentTask { id: 33, scene_id: 3, agent: "bccbdf7d-093e-911b-a2c0-047c16c20e40", limit: 30000, pre│
+│                                                             ││ 2024-03-24 08:02:07 | main | INFO  | Sent completed task                                                                                       │
+│                                                             ││ 2024-03-24 08:02:07 | main | INFO  | Task to execute ID=32 Start=0 Limit=30000 TTL=-1711263697882                                              │
+│                                                             ││ 2024-03-24 08:02:07 | main | INFO  | NextTask(AgentTask { id: 32, scene_id: 3, agent: "bccbdf7d-093e-911b-a2c0-047c16c20e40", limit: 30000, pre│
+│                                                             ││ 2024-03-24 08:02:07 | main | INFO  | Sent completed task                                                                                       │
+│                                                             ││ 2024-03-24 08:02:07 | main | INFO  | Task to execute ID=31 Start=0 Limit=30000 TTL=-1711263697067                                              │
+└─────────────────────────────────────────────────────────────┘│ 2024-03-24 08:02:06 | main | INFO  | NextTask(AgentTask { id: 31, scene_id: 3, agent: "bccbdf7d-093e-911b-a2c0-047c16c20e40", limit: 30000, pre│
+┌─────────────────────────────────────────────────────────────┐│ 2024-03-24 08:02:06 | main | INFO  | Sent completed task                                                                                       │
+│Start scenario OK                                            ││ 2024-03-24 08:02:06 | main | INFO  | Task to execute ID=30 Start=0 Limit=30000 TTL=-1711263696248                                              │
+│Pruebas Full                                                 │└38/38───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+│Scenario ID?                                                 │┌App Logs────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│Stop scenario OK                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│Scenario ID?                                                 ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+│                                                             ││                                                                                                                                                │
+└─────────────────────────────────────────────────────────────┘└────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+
 # Index
 1. [Scenario design](#scenario-design)
 2. [Report generation](#report-gen)

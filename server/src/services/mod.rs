@@ -51,6 +51,9 @@ pub trait ServerServices {
     /// Sets a task as executed
     fn set_task_as_executed(&self, task : AgentTaskResult);
 
+    /// Number of tasks in this scenario
+    fn total_tasks(&self) -> u32;
+
     fn agent_from_ip(&self, ip : &str) -> ChaosResult<ConnectAgent>;
 
     fn generate_report(&self) -> ChaosResult<TestingReport>;

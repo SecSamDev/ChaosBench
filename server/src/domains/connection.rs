@@ -7,6 +7,7 @@ use serde::Serialize;
 pub struct ConnectLog {
     pub id : String,
     pub addr: Recipient<AgentLog>,
+    pub upd : Recipient<AgentCompletionUpdate>,
 }
 
 #[derive(ActixMessage)]
@@ -35,3 +36,11 @@ pub struct AgentLog(pub Log);
 #[derive(Serialize, ActixMessage)]
 #[rtype(result = "()")]
 pub struct AgentAppLog(pub AppLog);
+
+#[derive(Serialize, ActixMessage, Clone)]
+#[rtype(result = "()")]
+pub struct AgentCompletionUpdate {
+    pub agent : String,
+    pub total : u32,
+    pub completed : u32
+}

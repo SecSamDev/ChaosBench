@@ -8,9 +8,11 @@ use super::{agent::AppLog, Log, TestingReport};
 pub enum UserAction {
     BackupDB(String),
     AgentLogsAll,
+    StopAgentLogs,
     AgentLogs(LogSubscription),
     AppLogsAll,
     AppLogs(LogSubscription),
+    StopAppLogs,
     NoLogs,
     StartScenario(String),
     StopScenario(String),
@@ -34,6 +36,7 @@ pub struct LogSubscription {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum UserActionResponse {
+    AgentCompletion((u32,u32)),
     Logs(Log),
     AppLogs(AppLog),
     BackupDB(ChaosResult<()>),

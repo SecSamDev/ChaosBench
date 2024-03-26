@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use actix::{Actor, Context, Handler, Recipient};
 use chaos_core::api::{agent::AppLog, Log};
 
-use crate::domains::connection::{AgentAppLog, AgentLog, ConnectAppLog, ConnectLog, DisconnectAppLog, DisconnectLog};
+use crate::domains::connection::{AgentAppLog, AgentCompletionUpdate, AgentLog, ConnectAppLog, ConnectLog, DisconnectAppLog, DisconnectLog};
 
 pub struct LogServer {
-    sessions: HashMap<String, Recipient<AgentLog>>,
+    sessions: HashMap<String, (Recipient<AgentLog>, Recipient<AgentCompletionUpdate>)>,
     app_sessions: HashMap<String, Recipient<AgentAppLog>>
 }
 
@@ -20,7 +20,7 @@ impl LogServer {
 
     pub fn send_log(&self, log : Log) {
         self.sessions.iter().for_each(|(_id, addr)| {
-            addr.do_send(AgentLog(log.clone()))
+            addr.0.do_send(AgentLog(log.clone()))
         });
     }
     pub fn send_app_log(&self, log : AppLog) {
@@ -45,8 +45,8 @@ impl Handler<ConnectLog> for LogServer {
     type Result = ();
 
     fn handle(&mut self, msg: ConnectLog, _ctx: &mut Self::Context) -> Self::Result {
-        let ConnectLog { id, addr } = msg;
-        self.sessions.insert(id, addr);
+        let ConnectLog { id, addr, upd } = msg;
+        self.sessions.insert(id, (addr, upd));
     }
 }
 
@@ -89,5 +89,15 @@ impl Handler<AgentAppLog> for LogServer {
 
     fn handle(&mut self, msg: AgentAppLog, _ctx: &mut Self::Context) -> Self::Result {
         self.send_app_log(msg.0);
+    }
+}
+
+impl Handler<AgentCompletionUpdate> for LogServer {
+    type Result = ();
+
+    fn handle(&mut self, msg: AgentCompletionUpdate, _ctx: &mut Self::Context) -> Self::Result {
+        for (_, session) in self.sessions.iter_mut() {
+            session.1.do_send(msg.clone());
+        }
     }
 }

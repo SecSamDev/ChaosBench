@@ -2,7 +2,7 @@ use actix::{Actor, Addr, AsyncContext, Handler, StreamHandler};
 use actix_web_actors::ws;
 use chaos_core::api::user_actions::{CreateScenario, UserAction, UserActionResponse};
 
-use crate::{domains::connection::{AgentAppLog, AgentLog, ConnectAppLog, ConnectLog, DisconnectLog}, state::ServerState};
+use crate::{domains::connection::{AgentAppLog, AgentCompletionUpdate, AgentLog, ConnectAppLog, ConnectLog, DisconnectLog}, state::ServerState};
 
 use super::logs::LogServer;
 pub struct UserConnection {
@@ -44,6 +44,16 @@ impl Handler<AgentAppLog> for UserConnection {
     }
 }
 
+impl Handler<AgentCompletionUpdate> for UserConnection {
+    type Result = ();
+
+    fn handle(&mut self, msg: AgentCompletionUpdate, ctx: &mut Self::Context) -> Self::Result {
+        let res = UserActionResponse::AgentCompletion((msg.completed, msg.total));
+        let bin = serde_json::to_vec(&res).unwrap();
+        ctx.binary(bin);
+    }
+}
+
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for UserConnection {
     fn finished(&mut self, _ctx: &mut Self::Context) {
         self.addr.do_send(DisconnectLog {
@@ -68,9 +78,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for UserConnection {
 
         let res = match data {
             UserAction::AgentLogsAll => {
-                let addr = ctx.address();
+                let upd = ctx.address().recipient();
+                let addr = ctx.address().recipient();
                 self.addr.do_send(ConnectLog {
-                    addr : addr.recipient(),
+                    addr,
+                    upd,
                     id :self.id.clone()
                 });
                 return
