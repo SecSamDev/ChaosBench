@@ -1,7 +1,5 @@
 use std::sync::mpsc::{Receiver, SyncSender as Sender};
-use std::time::Duration;
 use std::io::Write;
-use chaos_core::api::agent::AgentRequest;
 use log::LevelFilter;
 
 use log4rs::append::file::FileAppender;

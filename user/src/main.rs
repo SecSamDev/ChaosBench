@@ -14,7 +14,7 @@ use ratatui::{
     widgets::{block::*, *},
 };
 
-use chaos_core::{api::user_actions::{CreateScenario, UserAction, UserActionResponse}, err::ChaosResult};
+use chaos_core::{api::user_actions::{CreateScenario, LogSubscription, UserAction, UserActionResponse}, err::ChaosResult};
 use rustls::{ClientConfig, RootCertStore};
 use tungstenite::{stream::MaybeTlsStream, WebSocket};
 
@@ -43,13 +43,16 @@ pub struct UserApp {
     pub input_text : String,
     pub command_state : CommandState,
     pub window : SelectedWindow,
-    pub current_agent_completion : (u32, u32)
+    pub current_agent_completion : (u32, u32),
+    pub current_agent : Option<String>,
+    pub current_app : Option<String>
 }
 pub enum CommandState {
     None,
     CreateScenario(CreateScenarioState),
     StartScenario(SelectScenarioState),
-    StopScenario(SelectScenarioState),
+    AgentLogs(SelectAgentState),
+    AppLogs(SelectAgentState),
     Backup(BackupName),
 }
 #[derive(Default)]
@@ -62,25 +65,34 @@ pub struct SelectScenarioState {
     pub id : Option<String>
 }
 #[derive(Default)]
+pub struct SelectAgentState {
+    pub name : Option<String>
+}
+#[derive(Default)]
 pub struct BackupName {
     pub name : Option<String>
 }
 
 type WsClient = WebSocket<MaybeTlsStream<TcpStream>>;
 
-const COMMAND_LIST : &[[&str; 2]] = &[["Agent logs", "Shows an agent logs"],
-["Stop agent logs", "Stops receiving agent logs"],
-["App logs", "Shows app logs of an agent"],
-["Stop app logs", "Stops receiving app logs"],
-["Create scenario", "Creates a new testing scenario"],
-["Start scenario", "Starts a testing scenario"],
-["Stop scenario", "Stops a testing scenario"],
-["Edit scenario", "Edit parameters of scenario"],
-["List scenarios", "List all file scenario"],
-["List test scenarios", "List all testing scenarios"],
-["Backup", "Saves the server state"],
-["Report", "Generates a markdown report"],
-["Exit", "Exists the interface"]];
+const COMMAND_LIST : &[[&str; 2]] = &[
+    ["List Agents", "List all agents"],
+    ["All Agent logs", "Shows all agent logs"],
+    ["Agent logs", "Shows an agent logs"],
+    ["Stop agent logs", "Stops receiving agent logs"],
+    ["All App logs", "Shows app logs of all agent"],
+    ["App logs", "Shows app logs of an agent"],
+    ["Stop app logs", "Stops receiving app logs"],
+    ["Create scenario", "Creates a new testing scenario"],
+    ["Start scenario", "Starts a testing scenario"],
+    ["Stop scenario", "Stops a testing scenario"],
+    ["Edit scenario", "Edit parameters of scenario"],
+    ["List scenarios", "List all file scenario"],
+    ["List test scenarios", "List all testing scenarios"],
+    ["Backup", "Saves the server state"],
+    ["Report", "Generates a markdown report"],
+    ["Exit", "Exists the interface"]
+];
 
 const ASCII_ART: &str = r#"
 ______________                     ________                  ______  
@@ -120,7 +132,7 @@ fn main() -> io::Result<()> {
         //let _ = stream.set_nonblocking(true);
         let _ = stream
             .sock
-            .set_read_timeout(Some(Duration::from_secs_f32(0.1)));
+            .set_read_timeout(Some(Duration::from_secs_f32(0.05)));
         let _ = stream
             .sock
             .set_write_timeout(Some(Duration::from_secs_f32(2.0)));
@@ -150,7 +162,9 @@ impl UserApp {
             window : SelectedWindow::Commands,
             agent_logs_i : 0,
             app_logs_i : 0,
-            current_agent_completion : (0, 0)
+            current_agent_completion : (0, 0),
+            current_agent : None,
+            current_app : None
         }
     }
     /// runs the application's main loop until the user quits
@@ -218,17 +232,17 @@ impl UserApp {
         );
         frame.render_widget(
             if self.window == SelectedWindow::AgentLogs {
-                Table::new(agent_rows, [Constraint::Max(10), Constraint::Percentage(100)]).block(Block::bordered().style(border_style()).borders(Borders::ALL).title("Agent Logs").title_bottom(format!("{}/{}", self.current_agent_completion.0, self.current_agent_completion.1)).blue())
+                Table::new(agent_rows, [Constraint::Max(10), Constraint::Percentage(100)]).block(Block::bordered().style(border_style()).borders(Borders::ALL).title(format!(" Agent Logs ({}) ", self.current_agent.as_ref().map(|v|v.as_str()).unwrap_or("-"))).title_bottom(format!("{}/{}", self.current_agent_completion.0, self.current_agent_completion.1)).blue())
             }else {
-                Table::new(agent_rows, [Constraint::Max(10), Constraint::Percentage(100)]).block(Block::bordered().style(border_style()).borders(Borders::ALL).title("Agent Logs").title_bottom(format!("{}/{}", self.current_agent_completion.0, self.current_agent_completion.1)))
+                Table::new(agent_rows, [Constraint::Max(10), Constraint::Percentage(100)]).block(Block::bordered().style(border_style()).borders(Borders::ALL).title(format!(" Agent Logs ({}) ", self.current_agent.as_ref().map(|v|v.as_str()).unwrap_or("-"))).title_bottom(format!("{}/{}", self.current_agent_completion.0, self.current_agent_completion.1)))
             },
             right_pannel_bottom[0],
         );
         frame.render_widget(
             if self.window == SelectedWindow::AppLogs {
-                Table::new(app_rows, [Constraint::Max(10), Constraint::Percentage(100)]).block(Block::bordered().style(border_style()).borders(Borders::ALL).title("App Logs").blue())
+                Table::new(app_rows, [Constraint::Max(10), Constraint::Percentage(100)]).block(Block::bordered().style(border_style()).borders(Borders::ALL).title(format!(" App Logs ({}) ", self.current_app.as_ref().map(|v|v.as_str()).unwrap_or("-"))).blue())
             }else {
-                Table::new(app_rows, [Constraint::Max(10), Constraint::Percentage(100)]).block(Block::bordered().style(border_style()).borders(Borders::ALL).title("App Logs"))
+                Table::new(app_rows, [Constraint::Max(10), Constraint::Percentage(100)]).block(Block::bordered().style(border_style()).borders(Borders::ALL).title(format!(" App Logs ({}) ", self.current_app.as_ref().map(|v|v.as_str()).unwrap_or("-"))))
             },
             right_pannel_bottom[1],
         );
@@ -391,10 +405,17 @@ impl UserApp {
                 }
                 completed = true;
             },
-            CommandState::StopScenario(ss) => {
-                if ss.id.is_none() {
+            CommandState::AgentLogs(ss) => {
+                if ss.name.is_none() {
                     to_show.push(txt.clone());
-                    ss.id = Some(txt);
+                    ss.name = Some(txt);
+                }
+                completed = true;
+            },
+            CommandState::AppLogs(ss) => {
+                if ss.name.is_none() {
+                    to_show.push(txt.clone());
+                    ss.name = Some(txt);
                 }
                 completed = true;
             },
@@ -420,11 +441,14 @@ impl UserApp {
                 CommandState::StartScenario(ss) => {
                     self.start_sceanario(ss.id.unwrap())
                 },
-                CommandState::StopScenario(ss) => {
-                    self.stop_sceanario(ss.id.unwrap())
-                },
                 CommandState::Backup(v) => {
                     self.do_backup(v.name.unwrap());
+                },
+                CommandState::AppLogs(v) => {
+                    self.start_app_logs(v.name.unwrap());
+                },
+                CommandState::AgentLogs(v) => {
+                    self.start_agent_logs(v.name.unwrap());
                 }
             }
 
@@ -437,14 +461,23 @@ impl UserApp {
             None => return
         };
         match cmd {
+            "List Agents" => {
+                self.list_agents()
+            },
+            "All Agent logs" => {
+                self.start_all_agent_logs();
+            },
             "Agent logs" => {
-                self.start_agent_logs();
+                self.init_agent_logs();
             },
             "Stop agent logs" => {
                 self.stop_agent_logs();
             },
+            "All App logs" => {
+                self.start_all_app_logs();
+            },
             "App logs" => {
-                self.start_app_logs();
+                self.init_app_logs();
             },
             "Stop app logs" => {
                 self.stop_app_logs();
@@ -456,7 +489,7 @@ impl UserApp {
                 self.init_start_scenario();
             },
             "Stop scenario" => {
-                self.init_stop_scenario();
+                self.stop_sceanario();
             },
             "Edit scenario" => {
                 
@@ -522,6 +555,13 @@ impl UserApp {
                     self.show_app_log([v.file, v.msg]);
                     return
                 },
+                UserActionResponse::EnumerateAgents(v) => {
+                    for s in v {
+                        self.show_text(format!("- {}", s));
+                    }
+                    self.show_text("Agents:".into());
+                    return
+                }
                 UserActionResponse::BackupDB(v) => {
                     self.show_text(format!("Server Backup status {}", result_to_string(v)));
                 },
@@ -561,22 +601,42 @@ impl UserApp {
         }
     }
 
-    fn start_agent_logs(&mut self) {
+    fn start_all_agent_logs(&mut self) {
+        self.current_agent = Some("*".into());
         self.client
             .send(user_action_to_message(&UserAction::AgentLogsAll))
             .unwrap();
     }
+    fn start_agent_logs(&mut self, agent: String) {
+        self.current_agent = Some(agent.clone());
+        self.client
+            .send(user_action_to_message(&UserAction::AgentLogs(LogSubscription{
+                agent
+            })))
+            .unwrap();
+    }
     fn stop_agent_logs(&mut self) {
+        self.current_agent = None;
         self.client
             .send(user_action_to_message(&UserAction::StopAgentLogs))
             .unwrap();
     }
-    fn start_app_logs(&mut self) {
+    fn start_all_app_logs(&mut self) {
+        self.current_app = Some("*".into());
         self.client
             .send(user_action_to_message(&UserAction::AppLogsAll))
             .unwrap();
     }
+    fn start_app_logs(&mut self, agent : String) {
+        self.current_app = Some(agent.clone());
+        self.client
+            .send(user_action_to_message(&UserAction::AppLogs(LogSubscription {
+                agent
+            })))
+            .unwrap();
+    }
     fn stop_app_logs(&mut self) {
+        self.current_app = None;
         self.client
             .send(user_action_to_message(&UserAction::StopAppLogs))
             .unwrap();
@@ -584,6 +644,11 @@ impl UserApp {
     fn list_scenarios(&mut self) {
         self.client
             .send(user_action_to_message(&UserAction::EnumerateScenarios))
+            .unwrap();
+    }
+    fn list_agents(&mut self) {
+        self.client
+            .send(user_action_to_message(&UserAction::EnumerateAgents))
             .unwrap();
     }
     fn list_test_scenarios(&mut self) {
@@ -597,6 +662,18 @@ impl UserApp {
         self.input_text.clear();
         self.command_state = CommandState::CreateScenario(CreateScenarioState::default());
         self.show_text("Scenario ID?".into());
+    }
+    fn init_agent_logs(&mut self) {
+        self.input = true;
+        self.input_text.clear();
+        self.command_state = CommandState::AgentLogs(SelectAgentState::default());
+        self.show_text("Agent Name?".into());
+    }
+    fn init_app_logs(&mut self) {
+        self.input = true;
+        self.input_text.clear();
+        self.command_state = CommandState::AppLogs(SelectAgentState::default());
+        self.show_text("Agent Name?".into());
     }
 
     fn create_sceanario(&mut self, id : String, base_id : String) {
@@ -618,15 +695,9 @@ impl UserApp {
             .send(user_action_to_message(&UserAction::StartScenario(id)))
             .unwrap();
     }
-    fn init_stop_scenario(&mut self) {
-        self.input = true;
-        self.input_text.clear();
-        self.command_state = CommandState::StopScenario(SelectScenarioState::default());
-        self.show_text("Scenario ID?".into());
-    }
-    fn stop_sceanario(&mut self, id : String) {
+    fn stop_sceanario(&mut self) {
         self.client
-            .send(user_action_to_message(&UserAction::StopScenario(id)))
+            .send(user_action_to_message(&UserAction::StopScenario))
             .unwrap();
     }
     fn init_backup(&mut self) {

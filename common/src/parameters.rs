@@ -345,6 +345,12 @@ impl Serialize for TestParameter {
     }
 }
 
+impl From<String> for TestParameter {
+    fn from(value: String) -> Self {
+        Self::Text(value)
+    }
+}
+
 impl TestParameter {
     pub fn replace_with_vars(&mut self, vars : &TestVariables) {
         match self {
@@ -381,7 +387,6 @@ pub fn interpolate_text(template : &mut String, vars : &TestVariables) {
         let start_part = if start == 0 { "" } else { &template[0..start] };
         let end_part = if end - start == 0 { "" } else { &template[end..] };
         *template = format!("{}{}{}", start_part, txt, end_part);
-        println!("{}", template);
     }
 }
 

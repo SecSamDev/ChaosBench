@@ -13,7 +13,7 @@ use chaos_core::{
     parameters::TestParameters,
 };
 
-use crate::state::AgentState;
+use crate::{state::AgentState, sys_info::get_system_uuid};
 
 thread_local! {
     pub static FILE_HANDLES: RefCell<BTreeMap<String, Arc<AtomicBool>>> = RefCell::new(BTreeMap::new());
@@ -39,6 +39,7 @@ fn start_file_watcher(parameters: WatchLogParameters, state: &mut AgentState) {
     let stopper = Arc::new(AtomicBool::new(true));
     let stpr = stopper.clone();
     let channel = state.app_log_sender();
+    let agent = get_system_uuid().unwrap();
     std::thread::spawn(move || {
         let mut file = std::fs::File::open(&parameters.file).unwrap();
         let mut buffer = vec![0u8; 1024];
@@ -65,6 +66,7 @@ fn start_file_watcher(parameters: WatchLogParameters, state: &mut AgentState) {
                         let _ = channel.try_send(AppLog {
                             file: parameters.file.clone(),
                             msg: String::from_utf8_lossy(&str_to_send).into(),
+                            agent : agent.clone()
                         });
                         str_to_send.clear();
                         pos

@@ -29,7 +29,7 @@ pub trait ServerServices {
     fn execute_testing_scenario(&self, id : String) -> ChaosResult<()>;
 
     /// Remove a scenario from the queue
-    fn stop_testing_scenario(&self, id : String) -> ChaosResult<()>;
+    fn stop_testing_scenario(&self) -> ChaosResult<()>;
 
     /// Creates a testing scenario based on a file
     fn create_testing_scenario(&self, id : String, scenario : &str) -> ChaosResult<()>;
@@ -48,6 +48,8 @@ pub trait ServerServices {
 
     /// List all file scenarios
     fn list_scenarios(&self) -> Vec<String>;
+    /// List all agents
+    fn list_agents(&self) -> Vec<String>;
     /// Sets a task as executed
     fn set_task_as_executed(&self, task : AgentTaskResult);
 

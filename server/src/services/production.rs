@@ -58,7 +58,10 @@ impl ServerServices for ProductionService {
         Some(task)
     }
 
-    fn upload_artifact(&self, name: &str, location: &str) {}
+    fn upload_artifact(&self, name: &str, location: &str) {
+
+    }
+
     fn hash_state(&self) -> u64 {
         let db = self.repo.db.lock().unwrap();
         let scenario = match &db.scenario {
@@ -92,7 +95,7 @@ impl ServerServices for ProductionService {
         Ok(())
     }
 
-    fn stop_testing_scenario(&self, id: String) -> ChaosResult<()> {
+    fn stop_testing_scenario(&self) -> ChaosResult<()> {
         let mut db = self.repo.db.lock().unwrap();
         db.scenario = None;
         db.state = BTreeMap::new();
@@ -247,5 +250,10 @@ impl ServerServices for ProductionService {
         ret.add_content("\n</details>\n");
         ret.add_content(&format!("**Resume {}/{} {}**", scene_ok.len(), agents_total, if scene_ok.len() == agents_total {"✅"} else {"❌"}));
         Ok(ret)
+    }
+
+    fn list_agents(&self) -> Vec<String> {
+        let db = self.repo.db.lock().unwrap();
+        db.agents.keys().map(|v| v.to_string()).collect()
     }
 }

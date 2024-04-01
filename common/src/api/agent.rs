@@ -96,6 +96,22 @@ impl From<Arch> for &str {
     }
 }
 
+pub fn native_arch_str() -> &'static str {
+    #[cfg(target_arch="x86_64")]
+    {
+        "x86_64"
+    }
+    #[cfg(target_arch="x86")]
+    {
+        "x86"
+    }
+    #[cfg(target_arch="aarch64")]
+    {
+        "aarch64"
+    }
+        
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DownloadFileRequest {
     pub filename : String
@@ -127,7 +143,8 @@ pub struct NextTaskForAgentRes {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AppLog {
     pub msg : String,
-    pub file : String
+    pub file : String,
+    pub agent : String
 }
 
 /// Request from agent to server

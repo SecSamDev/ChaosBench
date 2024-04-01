@@ -1,4 +1,6 @@
-use chaos_core::{parameters::TestParameters, err::{ChaosResult, ChaosError}, action::TestActionType, tasks::AgentTask};
+use std::time::Duration;
+
+use chaos_core::{action::{wait::WaitParameters, TestActionType}, err::{ChaosError, ChaosResult}, parameters::{TestParameter, TestParameters}};
 
 use crate::{common::{now_milliseconds, AgentTaskInternal}, state::AgentState};
 
@@ -7,7 +9,7 @@ pub mod service;
 pub mod machine;
 pub mod workspace;
 pub mod watchlog;
-pub mod wait;
+pub mod upload;
 
 /// Ejecutar una acción que viene desde el servidor, la idea es que esto produzca un TaskResult que se pueda enviar de vuelta al servidor
 /// Además es necesario guardar el estado de la operación en una bbdd local, así como también la sobreescritura de acciones.
@@ -43,6 +45,7 @@ pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, t
         TestActionType::ServiceIsRunning => service::service_is_running(&parameters),
         TestActionType::RestartHost => machine::restart_host(&parameters),
         TestActionType::Execute => Ok(()),
+        TestActionType::UploadArtifact => upload::upload_artifact(&parameters),
         TestActionType::CleanTmpFolder => Ok(()),
         TestActionType::CleanAppFolder => Ok(()),
         TestActionType::SetAppEnvVars => Ok(()),
@@ -55,7 +58,17 @@ pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, t
         TestActionType::Null => Ok(()),
         TestActionType::HttpRequest => Ok(()),
         TestActionType::HttpResponse => Ok(()),
-        TestActionType::Wait => wait::wait_agent(&parameters),
+        TestActionType::Wait => {
+            let parameters: WaitParameters = parameters.try_into()?;
+            let elapsed = (now_milliseconds() - task.start).max(0).abs() as i64;
+            let duration_millis = parameters.duration.as_millis() as i64;
+            let remaining = duration_millis - elapsed;
+            if remaining > 0 {
+                std::thread::sleep(Duration::from_millis(remaining.min(100) as u64));
+                return Ok(())
+            }
+            Ok(())
+        },
         TestActionType::WatchLog => watchlog::start_listening_to_file_changes(&parameters, state),
         TestActionType::WatchLogStop => watchlog::stop_listening_to_file_changes(&parameters),
         TestActionType::Custom(action) => Err(chaos_core::err::ChaosError::Other(format!("Custom action {} not found", action))),

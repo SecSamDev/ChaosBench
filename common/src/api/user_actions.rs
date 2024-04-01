@@ -15,10 +15,11 @@ pub enum UserAction {
     StopAppLogs,
     NoLogs,
     StartScenario(String),
-    StopScenario(String),
+    StopScenario,
     CreateScenario(CreateScenario),
     EnumerateScenarios,
     EnumerateTestingScenarios,
+    EnumerateAgents,
     Report,
     #[default]
     None
@@ -45,6 +46,7 @@ pub enum UserActionResponse {
     CreateScenario(ChaosResult<()>),
     EnumerateScenarios(Vec<String>),
     EnumerateTestingScenarios(Vec<String>),
+    EnumerateAgents(Vec<String>),
     Report(TestingReport),
     #[default]
     None

@@ -2,7 +2,7 @@ use std::{net::TcpStream, str::FromStr, sync::{mpsc::{Receiver, RecvTimeoutError
 
 use chaos_core::{action::TestActionType, api::agent::{AgentRequest, AgentResponse, ConnectAgent}, err::ChaosError, tasks::AgentTaskResult};
 use rustls::{ClientConfig, RootCertStore};
-use tungstenite::{handshake::client::generate_key, http::{Uri, Version}, stream::MaybeTlsStream, Message, WebSocket};
+use tungstenite::{handshake::client::generate_key, stream::MaybeTlsStream, Message, WebSocket};
 
 use crate::{actions::execute_action, api::SERVER_CERTIFICATE, common::{now_milliseconds, AgentTaskInternal, StopCommand}, logging::init_logging, state::{AgentState, SERVER_ADDRESS, SERVER_PORT}, sys_info::{get_hostname, get_system_uuid}};
 
@@ -172,9 +172,10 @@ fn read_messages(state : &mut AgentState, client : &mut WsClient) -> Result<(), 
             Some(v) => v,
             None => return Ok(())
         };
-        log::info!("{:?}", res);
+        
         match res {
             AgentResponse::NextTask(task) => {
+                log::info!("Next action ({}): {:?}", task.id, task.action);
                 state.db.set_current_task(Some(task));
             },
             AgentResponse::CleanTask => {
@@ -187,6 +188,7 @@ fn read_messages(state : &mut AgentState, client : &mut WsClient) -> Result<(), 
                 state.db.set_commands(v);
             }
             AgentResponse::Stop => {
+                log::info!("Request to stop agent");
                 state.signal_shutdown(StopCommand::Stop);
             },
             AgentResponse::Variables(v) => {
@@ -214,7 +216,7 @@ fn do_work(state : &mut AgentState, client : &mut WsClient) -> Result<(), tungst
         },
         Some(v) => v.clone(),
     };
-    log::info!("Task to execute ID={} Start={} Limit={} TTL={}", task.id, task.start, task.limit, (task.start + task.limit) - now_milliseconds());
+    log::info!("Task to execute ({}) {:?}", task.id, task.action);
     if task.start == 0 {
         task.start = now_milliseconds();
     }
@@ -235,9 +237,10 @@ fn do_work(state : &mut AgentState, client : &mut WsClient) -> Result<(), tungst
         task.result = Some(Err(ChaosError::Other(format!("Error executing task {}: Timeout reached", task.id))));
     }
     if task.result.is_some() {
+        let msg = format!("Sent completed task ({}) {:?}", task.id, task.action);
         client.send(agent_request_to_message(&AgentRequest::CompleteTask(task.into())))?;
         state.db.clean_current_task();
-        log::info!("Sent completed task");
+        log::info!("{}", msg);
     }else {
         state.db.update_current_task(task);
     }

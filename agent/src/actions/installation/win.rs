@@ -13,7 +13,11 @@ pub fn execute_install(parameters: &TestParameters) -> ChaosResult<()> {
         .arg("/qn")
         .arg("/l*v")
         .arg(log_location.as_os_str());
+    for (param, value) in &parameters.parameters {
+        command.arg(format!("{}={}", param, value));
+    }
     let _status = parse_msi_result(command.status().unwrap().code().unwrap_or_default());
+    log::info!("Installed {}", parameters.installer);
     Ok(())
 }
 
@@ -29,6 +33,7 @@ pub fn execute_uninstall(parameters: &TestParameters)-> ChaosResult<()> {
         .arg("/l*v")
         .arg(log_location.as_os_str());
     let _status = parse_msi_result(command.status().unwrap().code().unwrap_or_default());
+    log::info!("Uninstalled {}", parameters.installer);
     Ok(())
 }
 
@@ -43,6 +48,9 @@ pub fn execute_install_with_error(parameters: &TestParameters) -> ChaosResult<()
         .arg("/qn")
         .arg("/l*v")
         .arg(log_location.as_os_str());
+    for (param, value) in parameters.parameters {
+        command.arg(format!("{}={}", param, value));
+    }
     let install_status = command.status().unwrap().code().unwrap_or_default();
     assert_eq!(parameters.error, install_status);
     let _status = parse_msi_result(install_status);

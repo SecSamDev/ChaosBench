@@ -2,7 +2,17 @@ use std::collections::BTreeMap;
 
 use serde::{Serialize, Deserialize};
 
-use crate::{common::deserialize_null_default, parameters::TestParameter};
+use crate::{api::agent::{native_arch_str, Arch, Os}, common::deserialize_null_default, parameters::TestParameter};
+
+pub const ARCH_VAR : &str = "arch";
+pub const OS_VAR : &str = "os";
+pub const HOSTNAME_VAR : &str = "hostname";
+
+#[cfg(not(target_os="windows"))]
+pub const HOSTNAME_ENV_VAR : &str = "HOSTNAME";
+#[cfg(target_os="windows")]
+pub const HOSTNAME_ENV_VAR : &str = "COMPUTERNAME";
+
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, Hash)]
 #[serde(transparent)]
@@ -20,7 +30,13 @@ pub struct ScenarioVariables {
 
 impl TestVariables {
     pub fn new() -> Self {
-        Self::default()
+        let mut map = BTreeMap::new();
+        map.insert(ARCH_VAR.into(), native_arch_str().to_string().into());
+        map.insert(OS_VAR.into(), Into::<&str>::into(Os::default()).to_string().into());
+        if let Ok(v) = std::env::var(HOSTNAME_ENV_VAR) {
+            map.insert(HOSTNAME_VAR.into(), v.into());
+        }
+        Self(map)
     }
     pub fn inner(&self) -> &BTreeMap<String, TestParameter> {
         &self.0

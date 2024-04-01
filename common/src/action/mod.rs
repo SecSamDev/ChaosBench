@@ -5,15 +5,19 @@ use serde::{
     Deserialize, Deserializer, Serialize,
 };
 
-use crate::{err::ChaosResult, parameters::{ScenarioParameters, TestParameters}};
+use crate::{
+    err::ChaosResult,
+    parameters::{ScenarioParameters, TestParameters},
+};
 
 use self::names::TASK_TIMEOUT;
 
 pub mod install;
 pub mod names;
 pub mod service;
-pub mod watchlog;
 pub mod wait;
+pub mod watchlog;
+pub mod upload;
 
 #[derive(Clone, Debug, Default, PartialEq, Hash)]
 pub enum TestActionType {
@@ -53,6 +57,8 @@ pub enum TestActionType {
     WatchLog,
     /// Stops listening for changes in a text file    
     WatchLogStop,
+    /// Uploads a file from the agent to the server
+    UploadArtifact,
     #[default]
     Null,
     Custom(String),
@@ -60,7 +66,8 @@ pub enum TestActionType {
 impl Serialize for TestActionType {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer {
+        S: serde::Serializer,
+    {
         serializer.serialize_str(self.into())
     }
 }
@@ -92,6 +99,7 @@ impl<'a> From<&'a TestActionType> for &'a str {
             TestActionType::HttpResponse => "HttpResponse",
             TestActionType::WatchLog => "WatchLog",
             TestActionType::WatchLogStop => "WatchLogStop",
+            TestActionType::UploadArtifact => "UploadArtifact",
             TestActionType::Custom(v) => v.as_str(),
         }
     }
@@ -149,40 +157,45 @@ impl From<&str> for TestActionType {
             "CloseUserSession" => TestActionType::CloseUserSession,
             "Download" => TestActionType::Download,
             "Null" => TestActionType::Null,
+            "Wait" => TestActionType::Wait,
+            "ServiceIsRunning" => TestActionType::ServiceIsRunning,
+            "HttpRequest" => TestActionType::HttpRequest,
+            "HttpResponse" => TestActionType::HttpResponse,
+            "WatchLog" => TestActionType::WatchLog,
+            "WatchLogStop" => TestActionType::WatchLogStop,
+            "UploadArtifact" => TestActionType::UploadArtifact,
             _ => TestActionType::Custom(value.to_string()),
         }
     }
 }
 
-
 #[derive(Clone, Debug, Default, Serialize, Deserialize, Hash)]
 pub struct CustomAction {
-    pub name : String,
-    pub action : TestActionType,
-    pub parameters : ScenarioParameters
+    pub name: String,
+    pub action: TestActionType,
+    pub parameters: ScenarioParameters,
 }
 
-
-pub fn get_timeout_field(parameters : &TestParameters) -> ChaosResult<Duration> {
+pub fn get_timeout_field(parameters: &TestParameters) -> ChaosResult<Duration> {
     Ok(parameters
-    .get(TASK_TIMEOUT)
-    .ok_or(format!("Install parameter {:?} not found", TASK_TIMEOUT))?
-    .try_into()
-    .map_err(|_| "Invalid parameter type, expected String".to_string())?)
+        .get(TASK_TIMEOUT)
+        .ok_or(format!("Install parameter {:?} not found", TASK_TIMEOUT))?
+        .try_into()
+        .map_err(|_| "Invalid parameter type, expected String".to_string())?)
 }
 
-pub fn get_duration_field(parameters : &TestParameters, field : &str) -> ChaosResult<Duration> {
+pub fn get_duration_field(parameters: &TestParameters, field: &str) -> ChaosResult<Duration> {
     Ok(parameters
-    .get(field)
-    .ok_or(format!("Parameter {:?} not found", field))?
-    .try_into()
-    .map_err(|_| "Invalid parameter type, expected duration string".to_string())?)
+        .get(field)
+        .ok_or(format!("Parameter {:?} not found", field))?
+        .try_into()
+        .map_err(|_| "Invalid parameter type, expected duration string".to_string())?)
 }
 
-pub fn get_string_field(parameters : &TestParameters, field : &str) -> ChaosResult<String> {
+pub fn get_string_field(parameters: &TestParameters, field: &str) -> ChaosResult<String> {
     Ok(parameters
-    .get(field)
-    .ok_or(format!("Parameter {:?} not found", field))?
-    .try_into()
-    .map_err(|_| "Invalid parameter type, expected String".to_string())?)
+        .get(field)
+        .ok_or(format!("Parameter {:?} not found", field))?
+        .try_into()
+        .map_err(|_| "Invalid parameter type, expected String".to_string())?)
 }

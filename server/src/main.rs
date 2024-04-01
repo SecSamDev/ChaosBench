@@ -85,8 +85,8 @@ pub fn read_test_scenarios() -> Vec<TestScenario> {
             let content = std::fs::read_to_string(entry.path()).expect("Scenario must be readable");
             let scenario = match serde_yaml::from_str(&content) {
                 Ok(v) => v,
-                Err(_) => {
-                    println!("Cannot parse Scenario {}", entry.file_name().to_str().unwrap_or_default());
+                Err(e) => {
+                    log::info!("Cannot parse Scenario {}: {}", entry.file_name().to_str().unwrap_or_default(), e);
                     continue;
                 }
             };

@@ -9,11 +9,27 @@ pub struct ConnectLog {
     pub addr: Recipient<AgentLog>,
     pub upd : Recipient<AgentCompletionUpdate>,
 }
+#[derive(ActixMessage)]
+#[rtype(result = "()")]
+pub struct ConnectLogByAgent {
+    pub id : String,
+    pub agent : String,
+    pub addr: Recipient<AgentLog>,
+    pub upd : Recipient<AgentCompletionUpdate>,
+}
 
 #[derive(ActixMessage)]
 #[rtype(result = "()")]
 pub struct ConnectAppLog {
     pub id : String,
+    pub addr: Recipient<AgentAppLog>,
+}
+
+#[derive(ActixMessage)]
+#[rtype(result = "()")]
+pub struct ConnectAppLogById {
+    pub id : String,
+    pub agent : String,
     pub addr: Recipient<AgentAppLog>,
 }
 

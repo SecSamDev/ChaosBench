@@ -2,7 +2,7 @@ use actix::{Actor, Addr, AsyncContext, Handler, StreamHandler};
 use actix_web_actors::ws;
 use chaos_core::api::user_actions::{CreateScenario, UserAction, UserActionResponse};
 
-use crate::{domains::connection::{AgentAppLog, AgentCompletionUpdate, AgentLog, ConnectAppLog, ConnectLog, DisconnectLog}, state::ServerState};
+use crate::{domains::connection::{AgentAppLog, AgentCompletionUpdate, AgentLog, ConnectAppLog, ConnectAppLogById, ConnectLog, ConnectLogByAgent, DisconnectLog}, state::ServerState};
 
 use super::logs::LogServer;
 pub struct UserConnection {
@@ -87,6 +87,26 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for UserConnection {
                 });
                 return
             },
+            UserAction::AgentLogs(s) => {
+                let upd = ctx.address().recipient();
+                let addr = ctx.address().recipient();
+                self.addr.do_send(ConnectLogByAgent {
+                    addr,
+                    upd,
+                    agent : s.agent,
+                    id :self.id.clone()
+                });
+                return
+            },
+            UserAction::AppLogs(s) => {
+                let addr = ctx.address().recipient();
+                self.addr.do_send(ConnectAppLogById {
+                    addr,
+                    agent : s.agent,
+                    id :self.id.clone()
+                });
+                return
+            },
             UserAction::AppLogsAll => {
                 let addr = ctx.address();
                 self.addr.do_send(ConnectAppLog {
@@ -98,9 +118,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for UserConnection {
             UserAction::Report => generate_report(&self.state),
             UserAction::BackupDB(v) => backup_db(v, &self.state),
             UserAction::StartScenario(v) => start_scenario(v, &self.state),
-            UserAction::StopScenario(v) => stop_scenario(v, &self.state),
+            UserAction::StopScenario => stop_scenario(&self.state),
             UserAction::EnumerateScenarios => list_scenarios(&self.state),
             UserAction::EnumerateTestingScenarios => list_testing_scenarios(&self.state),
+            UserAction::EnumerateAgents => list_agents(&self.state),
             UserAction::CreateScenario(v) => create_scenario(v, &self.state),
             _ => return
         };
@@ -120,8 +141,8 @@ fn create_scenario(create : CreateScenario, state: &ServerState) -> Option<UserA
     Some(UserActionResponse::CreateScenario(res))
 }
 
-fn stop_scenario(scenario : String, state : &ServerState) -> Option<UserActionResponse> {
-    let res = state.services.stop_testing_scenario(scenario);
+fn stop_scenario(state : &ServerState) -> Option<UserActionResponse> {
+    let res = state.services.stop_testing_scenario();
     Some(UserActionResponse::StopScenario(res))
 }
 fn start_scenario(scenario : String, state : &ServerState) -> Option<UserActionResponse> {
@@ -143,4 +164,8 @@ fn generate_report(state : &ServerState) -> Option<UserActionResponse> {
 
 fn process_user_message(msg : &[u8]) -> Option<UserAction> {
     Some(serde_json::from_slice(msg).ok()?)
+}
+fn list_agents(state : &ServerState) -> Option<UserActionResponse> {
+    let scenarios = state.services.list_agents();
+    Some(UserActionResponse::EnumerateAgents(scenarios))
 }
