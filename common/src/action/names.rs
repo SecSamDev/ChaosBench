@@ -8,4 +8,4 @@ pub const INSTALL_ERROR : &str = "install_error";
 
 pub const INSTALL_PARAMETERS : &str = "install_parameters";
 
-pub const APP_SERVICE_NAME : &str = "$service"; 
+pub const APP_SERVICE_NAME : &str = "$service";

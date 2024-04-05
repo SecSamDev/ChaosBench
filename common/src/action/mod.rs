@@ -18,6 +18,7 @@ pub mod service;
 pub mod wait;
 pub mod watchlog;
 pub mod upload;
+pub mod metrics;
 
 #[derive(Clone, Debug, Default, PartialEq, Hash)]
 pub enum TestActionType {
@@ -59,6 +60,14 @@ pub enum TestActionType {
     WatchLogStop,
     /// Uploads a file from the agent to the server
     UploadArtifact,
+    /// Starts taking CPU and RAM usage of a process by name
+    StartMetricsForProcess,
+    /// Stops taking CPU and RAM usage of a process by name
+    StopMetricsForProcess,
+    /// Starts taking CPU and RAM usage of a service
+    StartMetricsForService,
+    /// Stops taking CPU and RAM usage of a service
+    StopMetricsForService,
     #[default]
     Null,
     Custom(String),
@@ -100,6 +109,10 @@ impl<'a> From<&'a TestActionType> for &'a str {
             TestActionType::WatchLog => "WatchLog",
             TestActionType::WatchLogStop => "WatchLogStop",
             TestActionType::UploadArtifact => "UploadArtifact",
+            TestActionType::StartMetricsForProcess => "StartMetricsForProcess",
+            TestActionType::StopMetricsForProcess => "StopMetricsForProcess",
+            TestActionType::StartMetricsForService => "StartMetricsForService",
+            TestActionType::StopMetricsForService => "StopMetricsForService",
             TestActionType::Custom(v) => v.as_str(),
         }
     }
@@ -155,6 +168,10 @@ impl From<&str> for TestActionType {
             "ResetAppEnvVars" => TestActionType::ResetAppEnvVars,
             "StartUserSession" => TestActionType::StartUserSession,
             "CloseUserSession" => TestActionType::CloseUserSession,
+            "StartMetricsForProcess" => TestActionType::StartMetricsForProcess,
+            "StopMetricsForProcess"=> TestActionType::StopMetricsForProcess,
+            "StartMetricsForService"  => TestActionType::StartMetricsForService,
+            "StopMetricsForService" =>   TestActionType::StopMetricsForService,
             "Download" => TestActionType::Download,
             "Null" => TestActionType::Null,
             "Wait" => TestActionType::Wait,
@@ -193,6 +210,22 @@ pub fn get_duration_field(parameters: &TestParameters, field: &str) -> ChaosResu
 }
 
 pub fn get_string_field(parameters: &TestParameters, field: &str) -> ChaosResult<String> {
+    Ok(parameters
+        .get(field)
+        .ok_or(format!("Parameter {:?} not found", field))?
+        .try_into()
+        .map_err(|_| "Invalid parameter type, expected String".to_string())?)
+}
+
+pub fn get_u64_field(parameters: &TestParameters, field: &str) -> ChaosResult<u64> {
+    Ok(parameters
+        .get(field)
+        .ok_or(format!("Parameter {:?} not found", field))?
+        .try_into()
+        .map_err(|_| "Invalid parameter type, expected String".to_string())?)
+}
+
+pub fn get_f32_field(parameters: &TestParameters, field: &str) -> ChaosResult<f32> {
     Ok(parameters
         .get(field)
         .ok_or(format!("Parameter {:?} not found", field))?

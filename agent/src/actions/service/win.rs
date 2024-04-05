@@ -144,7 +144,7 @@ fn close_service_handle(handle : SC_HANDLE) {
     let _ = unsafe { CloseServiceHandle(handle) };
 }
 
-fn _open_service(name : &str) -> ChaosResult<SC_HANDLE> {
+pub fn open_service(name : &str) -> ChaosResult<SC_HANDLE> {
     let sc_manager = get_manager_handle()?;
     match open_service_with_manager(name, sc_manager) {
         Ok(v) => Ok(v),

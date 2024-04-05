@@ -2,11 +2,12 @@ use chaos_core::err::{ChaosError, ChaosResult};
 use uuid::Uuid;
 use windows::{
     core::PWSTR,
-    Win32::System::{
-        SystemInformation::{GetSystemFirmwareTable, RSMB},
-        WindowsProgramming::{GetComputerNameW, MAX_COMPUTERNAME_LENGTH},
-    },
+    Win32::{Foundation::FILETIME, System::{
+        ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS, PROCESS_MEMORY_COUNTERS_EX}, Services::{QueryServiceStatusEx, SC_STATUS_PROCESS_INFO, SERVICE_STATUS_PROCESS}, SystemInformation::{GetSystemFirmwareTable, GetSystemInfo, GlobalMemoryStatusEx, MEMORYSTATUSEX, RSMB, SYSTEM_INFO}, Threading::{GetProcessTimes, OpenProcess, PROCESS_QUERY_INFORMATION}, WindowsProgramming::{GetComputerNameW, MAX_COMPUTERNAME_LENGTH}
+    }},
 };
+
+use crate::actions::service::open_service;
 
 pub fn get_hostname() -> ChaosResult<String> {
     let mut buffer = [0u16; MAX_COMPUTERNAME_LENGTH as usize + 1];
@@ -51,6 +52,8 @@ pub fn get_system_uuid() -> ChaosResult<String> {
         "Cannot find ProductId"
     )))
 }
+
+
 
 #[test]
 fn system_uuid_must_be_obtained() {
