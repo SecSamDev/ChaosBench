@@ -94,13 +94,14 @@ const COMMAND_LIST : &[[&str; 2]] = &[
     ["Exit", "Exists the interface"]
 ];
 
-const ASCII_ART: &str = r#"
-______________                     ________                  ______  
+const DEFAULT_ASCII_ART : &str = r#"______________                     ________                  ______  
 __  ____/__  /_______ ________________  __ )____________________  /_ 
 _  /    __  __ \  __ `/  __ \_  ___/_  __  |  _ \_  __ \  ___/_  __ \
 / /___  _  / / / /_/ // /_/ /(__  )_  /_/ //  __/  / / / /__ _  / / /
 \____/  /_/ /_/\__,_/ \____//____/ /_____/ \___//_/ /_/\___/ /_/ /_/ 
 "#;
+
+const ASCII_ART : Option<&str> = option_env!("ASCIIART_USER");
 
 fn main() -> io::Result<()> {
     let route = format!("wss://{}:{}/_user/connect", SERVER_ADDRESS, SERVER_PORT);
@@ -227,7 +228,7 @@ impl UserApp {
         )
         .split(right_pannel[1]);
         frame.render_widget(
-            Paragraph::new(ASCII_ART.trim()).block(Block::default().set_style(border_style()).borders(Borders::ALL)),
+            Paragraph::new(ASCII_ART.unwrap_or(DEFAULT_ASCII_ART)).block(Block::default().set_style(border_style()).borders(Borders::ALL)),
             right_pannel[0],
         );
         frame.render_widget(

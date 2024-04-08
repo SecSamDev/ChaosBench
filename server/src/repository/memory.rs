@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::{Arc, Mutex}};
 
-use chaos_core::{api::agent::ConnectAgent, scenario::TestScenario, tasks::AgentTaskResult};
+use chaos_core::{action::metrics::MetricsArtifact, api::agent::ConnectAgent, common::deserialize_null_default, scenario::TestScenario, tasks::AgentTaskResult};
 use serde::{Deserialize, Serialize};
 
 use crate::domains::scenario::CalculatedScenario;
@@ -33,7 +33,9 @@ pub struct Database {
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct AgentSceneState {
     pub last_task : Option<u32>,
-    pub results : BTreeMap<u32, AgentTaskResult>
+    pub results : BTreeMap<u32, AgentTaskResult>,
+    #[serde(deserialize_with="deserialize_null_default")]
+    pub metric : BTreeMap<String , MetricsArtifact>
 }
 
 impl Database {

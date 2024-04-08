@@ -4,7 +4,7 @@ use crate::{repository::memory::MemoryRepository, utils::now_milliseconds};
 
 use super::ServerServices;
 use chaos_core::{
-    action::TestActionType,
+    action::{metrics::MetricsArtifact, TestActionType},
     api::{agent::ConnectAgent, TestingReport},
     common::hash_params_and_actions,
     err::{ChaosError, ChaosResult},
@@ -255,5 +255,11 @@ impl ServerServices for ProductionService {
     fn list_agents(&self) -> Vec<String> {
         let db = self.repo.db.lock().unwrap();
         db.agents.keys().map(|v| v.to_string()).collect()
+    }
+
+    fn set_metrics_for_agent(&self, agent : &str, metric_name : &str, metrics : MetricsArtifact) -> ChaosResult<()> {
+        let mut db = self.repo.db.lock().unwrap();
+        db.state.get_mut(agent).map(|v| v.metric.insert(metric_name.to_string(), metrics));
+        Ok(())
     }
 }

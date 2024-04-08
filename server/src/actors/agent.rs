@@ -82,7 +82,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for AgentConnection {
             AgentRequest::NextTask(hash) => {
                 
                 let actual_hash = self.state.services.hash_state();
-                log::info!("Asking for task: {}vs{}", hash, actual_hash);
                 let scenario = match self.state.services.current_scenario() {
                     Ok(v) => v,
                     Err(_) => return

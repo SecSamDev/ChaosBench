@@ -129,12 +129,17 @@ fn on_start_service(state : &mut AgentState, client : &mut WsClient) -> Option<b
 }
 
 fn send_logs(state : &mut AgentState, client : &mut WsClient) -> Result<(), tungstenite::Error> {
+    let mut total = 0;
     loop {
         let log = match state.try_recv_app_log() {
             Some(v) => v,
             None => break
         };
+        total += 1;
         client.send(agent_request_to_message(&AgentRequest::AppLog(log)))?;
+        if total > 20 {
+            break;
+        }
     }
     let mut c = 0;
     loop {
@@ -235,6 +240,10 @@ fn do_work(state : &mut AgentState, client : &mut WsClient) -> Result<(), tungst
         log::warn!("Max timeout reached for task: {}", task.id);
         task.end = Some(now_milliseconds());
         task.result = Some(Err(ChaosError::Other(format!("Error executing task {}: Timeout reached", task.id))));
+    }
+    if task.result.is_none() && task.retries == 0 {
+        task.end = Some(now_milliseconds());
+        task.result = Some(Err(ChaosError::Other(format!("Error executing task {}: Max retries reached", task.id))));
     }
     if task.result.is_some() {
         let msg = format!("Sent completed task ({}) {:?}", task.id, task.action);

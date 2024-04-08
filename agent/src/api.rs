@@ -1,9 +1,9 @@
 use std::{cell::RefCell, io::{Read, Write}, path::PathBuf};
 
-use chaos_core::err::{ChaosError, ChaosResult};
-use reqwest::Certificate;
+use chaos_core::{action::metrics::MetricsArtifact, err::{ChaosError, ChaosResult}};
+use reqwest::{header::{HeaderMap, HeaderValue, CONTENT_TYPE}, Certificate};
 
-use crate::state::{SERVER_ADDRESS, SERVER_PORT};
+use crate::{state::{SERVER_ADDRESS, SERVER_PORT}, sys_info::get_system_uuid};
 
 
 pub const SERVER_CERTIFICATE : &[u8] = include_bytes!(env!("CA_CERT"));
@@ -14,10 +14,13 @@ thread_local! {
 
 fn instance_client() -> ChaosResult<reqwest::blocking::Client> {
     let agent = reqwest::blocking::ClientBuilder::new().user_agent("chaos-agent/1.0.0").https_only(true).use_rustls_tls().add_root_certificate(Certificate::from_pem(SERVER_CERTIFICATE).map_err(|e| ChaosError::Other(format!("Invalid pem for ca.crt: {}", e)))?);
-    agent.build().map_err(|e| ChaosError::Other(e.to_string()))
+    let mut headers = HeaderMap::new();
+    headers.insert("Agent-ID", HeaderValue::from_str(get_system_uuid()?.as_str()).unwrap());
+    agent.default_headers(headers).build().map_err(|e| ChaosError::Other(e.to_string()))
 }
 
 pub fn download_file(file_name : &str) -> ChaosResult<PathBuf> {
+    log::info!("Downloading {}", file_name);
     let destination = std::env::current_dir().unwrap_or_default().join(file_name);
     let file_url = format!("https://{}:{}/_agent/file/{}", SERVER_ADDRESS,SERVER_PORT, file_name);
     let res = CLIENT.with_borrow(|v| {
@@ -50,6 +53,30 @@ pub fn upload_file(file_name : &str, location : PathBuf) -> ChaosResult<()> {
     let _res = match res.error_for_status() {
         Ok(v) => v,
         Err(e) => return Err(ChaosError::Other(format!("Error getting file {}: {}", file_name, e)))
+    };
+    Ok(())
+}
+
+pub fn upload_data(file_name : &str, content : Vec<u8>) -> ChaosResult<()> {
+    let file_url = format!("https://{}:{}/_agent/file/{}", SERVER_ADDRESS, SERVER_PORT, file_name);
+    let res = CLIENT.with_borrow(|v| {
+        v.post(&file_url).body(content).send()
+    }).map_err(|e| ChaosError::Other(format!("Error getting file {}: {}", file_name, e)))?;
+    let _res = match res.error_for_status() {
+        Ok(v) => v,
+        Err(e) => return Err(ChaosError::Other(format!("Error getting file {}: {}", file_name, e)))
+    };
+    Ok(())
+}
+
+pub fn upload_metric(metric_name : &str, content : &MetricsArtifact) -> ChaosResult<()> {
+    let file_url = format!("https://{}:{}/_agent/metric/{}", SERVER_ADDRESS, SERVER_PORT, metric_name);
+    let res = CLIENT.with_borrow(|v| {
+        v.post(&file_url).header(CONTENT_TYPE, "application/json").body(serde_json::to_vec(content).unwrap_or_default()).send()
+    }).map_err(|e| ChaosError::Other(format!("Error uploading metrics {}: {}", metric_name, e)))?;
+    let _res = match res.error_for_status() {
+        Ok(v) => v,
+        Err(e) => return Err(ChaosError::Other(format!("Error uploading metrics {}: {}", metric_name, e)))
     };
     Ok(())
 }

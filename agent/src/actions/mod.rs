@@ -11,6 +11,7 @@ pub mod workspace;
 pub mod watchlog;
 pub mod upload;
 pub mod metrics;
+pub mod download;
 
 /// Ejecutar una acción que viene desde el servidor, la idea es que esto produzca un TaskResult que se pueda enviar de vuelta al servidor
 /// Además es necesario guardar el estado de la operación en una bbdd local, así como también la sobreescritura de acciones.
@@ -19,6 +20,7 @@ pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, t
     let commands = state.db.get_commands();
     let mut parameters: TestParameters = global_parameters.into();
     let mut action = origin_action.clone();
+    task.retries -= 1;
     if let TestActionType::Custom(ca) = origin_action {
         for command in commands {
             if command.name == ca {
@@ -71,12 +73,14 @@ pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, t
             Ok(())
         },
         TestActionType::WatchLog => watchlog::start_listening_to_file_changes(&parameters, state),
-        TestActionType::WatchLogStop => watchlog::stop_listening_to_file_changes(&parameters),
+        TestActionType::StopWatchLog => watchlog::stop_listening_to_file_changes(&parameters),
         TestActionType::Custom(action) => Err(chaos_core::err::ChaosError::Other(format!("Custom action {} not found", action))),
-        TestActionType::StartMetricsForProcess => Ok(()),
-        TestActionType::StopMetricsForProcess => Ok(()),
+        TestActionType::StartMetricsForProcess => metrics::start_metric_for_process(&parameters),
+        TestActionType::StopMetricsForProcess => metrics::stop_metric_for_process(&parameters),
+        TestActionType::UploadProcessMetrics => metrics::upload_metric_for_process(&parameters),
         TestActionType::StartMetricsForService => metrics::start_metric_for_service(&parameters),
-        TestActionType::StopMetricsForService => Ok(()),
+        TestActionType::StopMetricsForService => metrics::stop_metric_for_service(&parameters),
+        TestActionType::UploadServiceMetrics => metrics::upload_metric_for_service(&parameters)
     };
     task.result = Some(res);
     task.end = Some(now_milliseconds());

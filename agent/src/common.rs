@@ -13,7 +13,8 @@ pub struct AgentTaskInternal {
     pub end : Option<i64>,
     pub action : TestActionType,
     pub parameters : TestParameters,
-    pub result : Option<Result<(), ChaosError>> 
+    pub result : Option<Result<(), ChaosError>>,
+    pub retries : u32,
 }
 
 pub enum StopCommand {
@@ -65,7 +66,8 @@ impl From<AgentTaskInternal> for AgentTaskResult {
             limit : v.limit,
             parameters : v.parameters,
             result : v.result.unwrap_or_else(|| Ok(())),
-            start : v.start
+            start : v.start,
+            retries : v.retries,
         }
     }
 }
@@ -81,7 +83,8 @@ impl From<&AgentTaskInternal> for AgentTaskResult {
             limit : v.limit,
             parameters : v.parameters.clone(),
             result : v.result.clone().unwrap_or_else(|| Ok(())),
-            start : v.start
+            start : v.start,
+            retries : v.retries
         }
     }
 }

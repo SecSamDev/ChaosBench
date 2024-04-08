@@ -277,22 +277,22 @@ impl TryFrom<TestParameter> for i32 {
     }
 }
 
-impl TryFrom<&TestParameter> for u64 {
-    type Error = &'static str;
-    fn try_from(value: &TestParameter) -> Result<Self, Self::Error> {
-        Ok(match value {
-            TestParameter::U64(v) => *v as u64,
-            TestParameter::I64(v) => *v as u64,
-            _ => return Err("Invalid numeric value"),
-        })
-    }
-}
 impl TryFrom<TestParameter> for u64 {
     type Error = &'static str;
     fn try_from(value: TestParameter) -> Result<Self, Self::Error> {
         Ok(match value {
             TestParameter::U64(v) => v,
             TestParameter::I64(v) => v as u64,
+            _ => return Err("Invalid numeric value"),
+        })
+    }
+}
+impl TryFrom<&TestParameter> for u64 {
+    type Error = &'static str;
+    fn try_from(value: &TestParameter) -> Result<Self, Self::Error> {
+        Ok(match value {
+            TestParameter::U64(v) => *v,
+            TestParameter::I64(v) => *v as u64,
             _ => return Err("Invalid numeric value"),
         })
     }
@@ -326,11 +326,22 @@ impl TryFrom<&TestParameter> for f64 {
         })
     }
 }
-impl TryFrom<TestParameter> for f64 {
+impl TryFrom<&TestParameter> for u32 {
+    type Error = &'static str;
+    fn try_from(value: &TestParameter) -> Result<Self, Self::Error> {
+        Ok(match value {
+            TestParameter::U64(v) => *v as u32,
+            TestParameter::I64(v) => *v as u32,
+            _ => return Err("Invalid numeric value"),
+        })
+    }
+}
+impl TryFrom<TestParameter> for u32 {
     type Error = &'static str;
     fn try_from(value: TestParameter) -> Result<Self, Self::Error> {
         Ok(match value {
-            TestParameter::F64(v) => v,
+            TestParameter::U64(v) => v as u32,
+            TestParameter::I64(v) => v as u32,
             _ => return Err("Invalid numeric value"),
         })
     }

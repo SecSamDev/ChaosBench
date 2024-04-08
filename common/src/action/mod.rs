@@ -18,6 +18,7 @@ pub mod service;
 pub mod wait;
 pub mod watchlog;
 pub mod upload;
+pub mod download;
 pub mod metrics;
 
 #[derive(Clone, Debug, Default, PartialEq, Hash)]
@@ -57,17 +58,21 @@ pub enum TestActionType {
     /// Uploads all new lines of a text file
     WatchLog,
     /// Stops listening for changes in a text file    
-    WatchLogStop,
+    StopWatchLog,
     /// Uploads a file from the agent to the server
     UploadArtifact,
     /// Starts taking CPU and RAM usage of a process by name
     StartMetricsForProcess,
     /// Stops taking CPU and RAM usage of a process by name
     StopMetricsForProcess,
+    /// Uploads metrics of a process
+    UploadProcessMetrics,
     /// Starts taking CPU and RAM usage of a service
     StartMetricsForService,
     /// Stops taking CPU and RAM usage of a service
     StopMetricsForService,
+    /// Uploads metrics of a service
+    UploadServiceMetrics,
     #[default]
     Null,
     Custom(String),
@@ -107,12 +112,14 @@ impl<'a> From<&'a TestActionType> for &'a str {
             TestActionType::HttpRequest => "HttpRequest",
             TestActionType::HttpResponse => "HttpResponse",
             TestActionType::WatchLog => "WatchLog",
-            TestActionType::WatchLogStop => "WatchLogStop",
+            TestActionType::StopWatchLog => "StopWatchLog",
             TestActionType::UploadArtifact => "UploadArtifact",
             TestActionType::StartMetricsForProcess => "StartMetricsForProcess",
             TestActionType::StopMetricsForProcess => "StopMetricsForProcess",
+            TestActionType::UploadProcessMetrics => "UploadProcessMetrics",
             TestActionType::StartMetricsForService => "StartMetricsForService",
             TestActionType::StopMetricsForService => "StopMetricsForService",
+            TestActionType::UploadServiceMetrics => "UploadServiceMetrics",
             TestActionType::Custom(v) => v.as_str(),
         }
     }
@@ -170,8 +177,10 @@ impl From<&str> for TestActionType {
             "CloseUserSession" => TestActionType::CloseUserSession,
             "StartMetricsForProcess" => TestActionType::StartMetricsForProcess,
             "StopMetricsForProcess"=> TestActionType::StopMetricsForProcess,
+            "UploadProcessMetrics" => TestActionType::UploadProcessMetrics,
             "StartMetricsForService"  => TestActionType::StartMetricsForService,
             "StopMetricsForService" =>   TestActionType::StopMetricsForService,
+            "UploadServiceMetrics" => TestActionType::UploadServiceMetrics,
             "Download" => TestActionType::Download,
             "Null" => TestActionType::Null,
             "Wait" => TestActionType::Wait,
@@ -179,7 +188,7 @@ impl From<&str> for TestActionType {
             "HttpRequest" => TestActionType::HttpRequest,
             "HttpResponse" => TestActionType::HttpResponse,
             "WatchLog" => TestActionType::WatchLog,
-            "WatchLogStop" => TestActionType::WatchLogStop,
+            "StopWatchLog" => TestActionType::StopWatchLog,
             "UploadArtifact" => TestActionType::UploadArtifact,
             _ => TestActionType::Custom(value.to_string()),
         }

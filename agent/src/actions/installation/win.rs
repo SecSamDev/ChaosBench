@@ -3,6 +3,7 @@ use chaos_core::{action::install::{InstallParameters, InstallWithErrorParameters
 use crate::{api::download_file, common::create_file_path_in_workspace};
 
 pub fn execute_install(parameters: &TestParameters) -> ChaosResult<()> {
+    log::info!("Executing install");
     let parameters: InstallParameters = parameters.try_into()?;
     let mut command = std::process::Command::new(r"C:\Windows\System32\msiexec.exe");
     let log_location = create_file_path_in_workspace("install.log");

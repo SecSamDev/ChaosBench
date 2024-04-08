@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use chaos_core::{action::TestActionType, parameters::{TestParameters, REMOTE_SERVER}, scenario::{ScenePreparationActions, TestScenario, TestScene}, tasks::AgentTask};
+use chaos_core::{action::{names::TASK_RETRIES, TestActionType}, parameters::{TestParameters, REMOTE_SERVER}, scenario::{ScenePreparationActions, TestScenario, TestScene}, tasks::AgentTask};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -27,7 +27,14 @@ impl From<&TestScenario> for CalculatedScenario {
             scene_to_tasks(scene, i, test, &mut tasks);
             i += 1;
         }
+
+        let default_retry = test.parameters.global.get(TASK_RETRIES).map(|v| v.try_into().unwrap_or(1u32)).unwrap_or(1u32);
         for action in &test.scene_preparation.cleanup.actions {
+            let retries = if action_is_wait(action, test) {
+                u32::MAX
+            }else {
+                default_retry
+            };
             tasks.push(AgentTask {
                 scene_id : test.scenes.len() as u32 - 1,
                 action : action.clone(),
@@ -35,7 +42,8 @@ impl From<&TestScenario> for CalculatedScenario {
                 id : tasks.len() as u32,
                 preparation : true,
                 limit : test.scene_preparation.phase_timeout.as_millis() as i64,
-                parameters : TestParameters::new()
+                parameters : TestParameters::new(),
+                retries
             })
         }
         Self {
@@ -65,20 +73,32 @@ fn scene_to_tasks(scene : &TestScene, scene_i : u32, scenario : &TestScenario, t
     }
     scene_preparation(&scenario.scene_preparation.after, scene_i, scene, scenario, tasks);
 }
-fn phase_to_tasks(phase : &TestActionType, scene_id : u32, scene : &TestScene, _scenario : &TestScenario, tasks : &mut Vec<AgentTask>) {
+fn phase_to_tasks(action : &TestActionType, scene_id : u32, scene : &TestScene, scenario : &TestScenario, tasks : &mut Vec<AgentTask>) {
+    let retries = if action_is_wait(action, scenario) {
+        u32::MAX
+    }else {
+        scenario.parameters.global.get(TASK_RETRIES).map(|v| v.try_into().unwrap_or(1u32)).unwrap_or(1u32)
+    };
     tasks.push(AgentTask {
         scene_id,
-        action : phase.clone(),
+        action : action.clone(),
         agent : String::new(),
         id : tasks.len() as u32,
         preparation : false,
         limit : scene.phase_timeout.as_millis() as i64,
-        parameters : TestParameters::new()
+        parameters : TestParameters::new(),
+        retries
     });
 }
 
-fn scene_preparation(preps : &ScenePreparationActions, scene_id : u32, scene : &TestScene, _scenario : &TestScenario, tasks : &mut Vec<AgentTask>) {
+fn scene_preparation(preps : &ScenePreparationActions, scene_id : u32, scene : &TestScene, scenario : &TestScenario, tasks : &mut Vec<AgentTask>) {
+    let default_retry = scenario.parameters.global.get(TASK_RETRIES).map(|v| v.try_into().unwrap_or(1u32)).unwrap_or(1u32);
     for action in &preps.actions {
+        let retries = if action_is_wait(action, scenario) {
+            u32::MAX
+        }else {
+            default_retry
+        };
         tasks.push(AgentTask {
             scene_id,
             action : action.clone(),
@@ -86,7 +106,24 @@ fn scene_preparation(preps : &ScenePreparationActions, scene_id : u32, scene : &
             id : tasks.len() as u32,
             preparation : true,
             limit : scene.phase_timeout.as_millis() as i64,
-            parameters : TestParameters::new()
+            parameters : TestParameters::new(),
+            retries
         })
     }
+}
+
+fn action_is_wait(action : &TestActionType, scenario : &TestScenario) -> bool {
+   if action == &TestActionType::Wait {
+        return true
+    }
+    if let TestActionType::Custom(c) = action {
+        for act in &scenario.actions {
+            if &act.name == c {
+                if act.action == TestActionType::Wait {
+                    return true
+                }
+            }
+        }
+    }
+    false
 }

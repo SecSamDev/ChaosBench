@@ -40,7 +40,8 @@ impl Database {
             limit : v.limit,
             parameters : v.parameters,
             result : None,
-            start : 0
+            start : 0,
+            retries : v.retries
         });
     }
     pub fn set_global_parameters(&mut self, params : ScenarioParameters) {

@@ -1,5 +1,5 @@
 pub mod production;
-use chaos_core::{api::{agent::ConnectAgent, TestingReport}, err::ChaosResult, scenario::TestScenario, tasks::{AgentTask, AgentTaskResult}};
+use chaos_core::{action::metrics::MetricsArtifact, api::{agent::ConnectAgent, TestingReport}, err::ChaosResult, scenario::TestScenario, tasks::{AgentTask, AgentTaskResult}};
 
 pub trait ServerServices {
     /// Gets the remote server when intercepting requests
@@ -59,4 +59,6 @@ pub trait ServerServices {
     fn agent_from_ip(&self, ip : &str) -> ChaosResult<ConnectAgent>;
 
     fn generate_report(&self) -> ChaosResult<TestingReport>;
+
+    fn set_metrics_for_agent(&self, agent : &str, metric_name : &str, metrics : MetricsArtifact) -> ChaosResult<()>;
 }
