@@ -95,7 +95,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for AgentConnection {
                     ctx.binary(bin);
                     return
                 }
-                let task = match self.state.services.get_next_task_for_agent(&self.id) {
+                let mut task = match self.state.services.get_next_task_for_agent(&self.id) {
                     Some(v) => v,
                     None => {
                         let bin = serde_json::to_vec(&AgentResponse::Wait).unwrap();
@@ -103,6 +103,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for AgentConnection {
                         return
                     } 
                 };
+                task.agent = self.id.clone();
+                if task.action.is_server() {
+                    //TODO
+                    return
+                }
                 let bin = serde_json::to_vec(&AgentResponse::NextTask(task)).unwrap();
                 ctx.binary(bin);
             }

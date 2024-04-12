@@ -2,9 +2,18 @@ use chaos_core::err::{ChaosError, ChaosResult};
 use uuid::Uuid;
 use windows::{
     core::PWSTR,
-    Win32::{Foundation::FILETIME, System::{
-        ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS, PROCESS_MEMORY_COUNTERS_EX}, Services::{QueryServiceStatusEx, SC_STATUS_PROCESS_INFO, SERVICE_STATUS_PROCESS}, SystemInformation::{GetSystemFirmwareTable, GetSystemInfo, GlobalMemoryStatusEx, MEMORYSTATUSEX, RSMB, SYSTEM_INFO}, Threading::{GetProcessTimes, OpenProcess, PROCESS_QUERY_INFORMATION}, WindowsProgramming::{GetComputerNameW, MAX_COMPUTERNAME_LENGTH}
-    }},
+    Win32::{
+        Foundation::{CloseHandle, ERROR_NO_MORE_FILES},
+        System::{
+            Diagnostics::ToolHelp::{
+                CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32,
+                TH32CS_SNAPPROCESS,
+            },
+            SystemInformation::{GetSystemFirmwareTable, RSMB},
+            Threading::OpenProcess,
+            WindowsProgramming::{GetComputerNameW, MAX_COMPUTERNAME_LENGTH},
+        },
+    }
 };
 
 use crate::actions::service::open_service;
@@ -53,7 +62,37 @@ pub fn get_system_uuid() -> ChaosResult<String> {
     )))
 }
 
+pub fn get_process_by_name(name: &str) -> Option<u32> {
+    let mut proc_entry = PROCESSENTRY32::default();
+    proc_entry.dwSize = std::mem::size_of::<PROCESSENTRY32>() as u32;
 
+    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0).ok() }?;
+    unsafe { Process32First(snapshot, &mut proc_entry).ok() }?;
+    let name_arr = name.as_bytes();
+    loop {
+        if is_desired_process(name_arr, &proc_entry.szExeFile[..]) {
+            unsafe { let _ = CloseHandle(snapshot); };
+            return Some(proc_entry.th32ProcessID);
+        }
+        if let Err(e) = unsafe { Process32Next(snapshot, &mut proc_entry) } {
+            if e.code() == ERROR_NO_MORE_FILES.to_hresult() {
+                break;
+            }
+        }
+    }
+
+    unsafe { let _ = CloseHandle(snapshot); };
+    None
+}
+
+fn is_desired_process(search : &[u8], proc_name : &[u8]) -> bool {
+    for (a,b) in search.iter().zip(proc_name.iter()) {
+        if *a != *b {
+            return false
+        }
+    }
+    true
+}
 
 #[test]
 fn system_uuid_must_be_obtained() {

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use serde::{Serialize, Deserialize};
 
-use crate::{api::agent::{native_arch_str, Arch, Os}, common::deserialize_null_default, parameters::TestParameter};
+use crate::{api::agent::{native_arch_str, Os}, common::deserialize_null_default, parameters::TestParameter};
 
 pub const ARCH_VAR : &str = "arch";
 pub const OS_VAR : &str = "os";

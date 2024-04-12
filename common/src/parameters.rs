@@ -236,6 +236,22 @@ impl TryFrom<&TestParameter> for String {
     }
 }
 
+impl TryFrom<TestParameter> for String {
+    type Error = &'static str;
+    fn try_from(value: TestParameter) -> Result<Self, Self::Error> {
+        Ok(match value {
+            TestParameter::Text(v) => v,
+            TestParameter::Bool(v) => v.to_string(),
+            TestParameter::U64(v) => v.to_string(),
+            TestParameter::I64(v) => v.to_string(),
+            TestParameter::F64(v) => v.to_string(),
+            TestParameter::Obj(_) => return Err("Cannot convert from obj to string"),
+            TestParameter::Vec(_) => return Err("Cannot convert from vec to string"),
+            TestParameter::Null => "".into(),
+        })
+    }
+}
+
 impl<'a> TryFrom<&'a TestParameter> for &'a str {
     type Error = &'static str;
     fn try_from(value: &'a TestParameter) -> Result<Self, Self::Error> {
@@ -355,6 +371,64 @@ impl TryFrom<&TestParameter> for Duration {
             TestParameter::I64(v) => Duration::from_secs(*v as u64),
             TestParameter::Text(v) => string_to_duration(v).ok_or("Invalid duration string")?,
             _ => return Err("Invalid duration value"),
+        })
+    }
+}
+
+impl TryFrom<TestParameter> for BTreeMap<String, TestParameter> {
+    type Error = &'static str;
+    fn try_from(value: TestParameter) -> Result<Self, Self::Error> {
+        Ok(match value {
+            TestParameter::Obj(v) => v,
+            _ => return Err("Invalid obj value"),
+        })
+    }
+}
+
+impl TryFrom<&TestParameter> for BTreeMap<String, TestParameter> {
+    type Error = &'static str;
+    fn try_from(value: &TestParameter) -> Result<Self, Self::Error> {
+        Ok(match value {
+            TestParameter::Obj(v) => v.clone(),
+            _ => return Err("Invalid obj value"),
+        })
+    }
+}
+
+impl TryFrom<&TestParameter> for Vec<TestParameter> {
+    type Error = &'static str;
+    fn try_from(value: &TestParameter) -> Result<Self, Self::Error> {
+        Ok(match value {
+            TestParameter::Vec(v) => v.clone(),
+            _ => return Err("Invalid obj value"),
+        })
+    }
+}
+impl TryFrom<TestParameter> for Vec<TestParameter> {
+    type Error = &'static str;
+    fn try_from(value: TestParameter) -> Result<Self, Self::Error> {
+        Ok(match value {
+            TestParameter::Vec(v) => v,
+            _ => return Err("Invalid obj value"),
+        })
+    }
+}
+
+impl TryFrom<&TestParameter> for Vec<String> {
+    type Error = &'static str;
+    fn try_from(value: &TestParameter) -> Result<Self, Self::Error> {
+        Ok(match value {
+            TestParameter::Vec(v) => v.iter().map(|v| v.try_into().unwrap_or_default()).collect(),
+            _ => return Err("Invalid obj value"),
+        })
+    }
+}
+impl TryFrom<TestParameter> for Vec<String> {
+    type Error = &'static str;
+    fn try_from(value: TestParameter) -> Result<Self, Self::Error> {
+        Ok(match value {
+            TestParameter::Vec(v) => v.into_iter().map(|v| v.try_into().unwrap_or_default()).collect(),
+            _ => return Err("Invalid obj value"),
         })
     }
 }

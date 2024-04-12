@@ -10,7 +10,7 @@ use std::{
     }, time::Duration
 };
 
-use crate::{actions::service::open_service, api::{upload_data, upload_metric}, common::now_milliseconds};
+use crate::{actions::service::open_service, api::{upload_data, upload_metric}, common::now_milliseconds, sys_info::get_process_by_name};
 
 thread_local! {
     pub static SERVICE_THREADS: RefCell<BTreeMap<String, (Arc<AtomicBool>, MetricCalculator)>> = RefCell::new(BTreeMap::new());
@@ -61,6 +61,8 @@ pub fn start_metric_for_process(parameters: &TestParameters) -> ChaosResult<()> 
     PROCESS_THREADS.with_borrow_mut(|v| {
         v.insert(executable_path, (stpr, MetricCalculator::new(parameters.sampling_frequency)));
     });
+    let process_name = std::path::Path::new(&parameters.executable_path);
+    let process_name = process_name.file_name().map(|v| v.to_string_lossy().to_string()).unwrap_or_else(|| " ".to_string());
     std::thread::spawn(move || {
         let mut last_check = unsafe { GetSystemTimeAsFileTime() }; 
         let mut user_time = FILETIME::default();
@@ -69,13 +71,10 @@ pub fn start_metric_for_process(parameters: &TestParameters) -> ChaosResult<()> 
             if !stopper.load(Ordering::Relaxed) {
                 break;
             }
-            let service_pid = match get_pid_of_service(&parameters.executable_path) {
-                Ok(v) => v,
-                Err(e) => {
-                    log::info!("Cannot obtain PID of process {}", e);
-                    return
-                }
-            };
+            let service_pid = match get_process_by_name(&process_name) {
+                Some(v) => v,
+                None => return
+            }; 
             let (ram, cpu, lc, kt, ut) = get_cpu_and_memory_usage(service_pid, last_check, kernel_time, user_time);
             kernel_time = kt;
             user_time = ut;

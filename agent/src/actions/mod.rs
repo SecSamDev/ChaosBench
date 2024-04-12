@@ -12,6 +12,7 @@ pub mod watchlog;
 pub mod upload;
 pub mod metrics;
 pub mod download;
+pub mod execute;
 
 /// Ejecutar una acción que viene desde el servidor, la idea es que esto produzca un TaskResult que se pueda enviar de vuelta al servidor
 /// Además es necesario guardar el estado de la operación en una bbdd local, así como también la sobreescritura de acciones.
@@ -47,7 +48,14 @@ pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, t
         TestActionType::StartService => service::start_service(&parameters),
         TestActionType::ServiceIsRunning => service::service_is_running(&parameters),
         TestActionType::RestartHost => machine::restart_host(&parameters),
-        TestActionType::Execute => Ok(()),
+        TestActionType::Execute => {
+            // Return if task has not finished
+            match execute::execute_command(task.id, &parameters) {
+                Some(v) => v,
+                None => return Ok(())
+            }
+        },
+        TestActionType::ExecuteServer => Ok(()),
         TestActionType::UploadArtifact => upload::upload_artifact(&parameters),
         TestActionType::CleanTmpFolder => Ok(()),
         TestActionType::CleanAppFolder => Ok(()),

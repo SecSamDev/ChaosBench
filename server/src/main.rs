@@ -1,11 +1,11 @@
-use std::{fs::create_dir_all, path::PathBuf, rc::Rc, sync::{Arc, Mutex}};
+use std::{path::PathBuf, rc::Rc, sync::{Arc, Mutex}};
 
 use actix::{Actor, Addr};
 use actix_web::{HttpServer, App, web::Data, middleware::Logger};
 use actors::logs::LogServer;
 use chaos_core::scenario::TestScenario;
 use repository::memory::{Database, MemoryRepository};
-use rustls::{pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs1KeyDer, PrivatePkcs8KeyDer}, server::{NoClientAuth, ServerConfig}};
+use rustls::server::ServerConfig;
 use services::production::ProductionService;
 use state::ServerState;
 use telemetry::init_logging;
@@ -58,7 +58,7 @@ async fn main() -> std::io::Result<()> {
 }
 
 pub fn listening_parameters() -> (String, u16) {
-    let address = std::env::var("SERVER_ADDRESS").unwrap_or_else(|_| "0.0.0.0".into());
+    let address = std::env::var("SERVER_IP").unwrap_or_else(|_| "::0".into());
     let port = SERVER_PORT.parse::<u16>().unwrap_or(DEFAULT_SERVER_PORT);
     (address, port)
 }

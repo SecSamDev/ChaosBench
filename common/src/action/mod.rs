@@ -1,4 +1,4 @@
-use std::{fmt, time::Duration};
+use std::{collections::BTreeMap, fmt, time::Duration};
 
 use serde::{
     de::{self, Visitor},
@@ -7,7 +7,7 @@ use serde::{
 
 use crate::{
     err::ChaosResult,
-    parameters::{ScenarioParameters, TestParameters},
+    parameters::{ScenarioParameters, TestParameter, TestParameters},
 };
 
 use self::names::TASK_TIMEOUT;
@@ -20,6 +20,7 @@ pub mod watchlog;
 pub mod upload;
 pub mod download;
 pub mod metrics;
+pub mod execute;
 
 #[derive(Clone, Debug, Default, PartialEq, Hash)]
 pub enum TestActionType {
@@ -40,6 +41,7 @@ pub enum TestActionType {
     /// Wait some time
     Wait,
     Execute,
+    ExecuteServer,
     /// Cleans the temporal folder associated with this test, not the real TMP folder
     CleanTmpFolder,
     CleanAppFolder,
@@ -99,6 +101,7 @@ impl<'a> From<&'a TestActionType> for &'a str {
             TestActionType::ServiceIsRunning => "ServiceIsRunning",
             TestActionType::RestartHost => "RestartHost",
             TestActionType::Execute => "Execute",
+            TestActionType::ExecuteServer => "ExecuteServer",
             TestActionType::CleanTmpFolder => "CleanTmpFolder",
             TestActionType::CleanAppFolder => "CleanAppFolder",
             TestActionType::SetAppEnvVars => "SetAppEnvVars",
@@ -167,6 +170,7 @@ impl From<&str> for TestActionType {
             "StartService" => TestActionType::StartService,
             "RestartHost" => TestActionType::RestartHost,
             "Execute" => TestActionType::Execute,
+            "ExecuteServer" => TestActionType::ExecuteServer,
             "CleanTmpFolder" => TestActionType::CleanTmpFolder,
             "CleanAppFolder" => TestActionType::CleanAppFolder,
             "SetAppEnvVars" => TestActionType::SetAppEnvVars,
@@ -226,6 +230,29 @@ pub fn get_string_field(parameters: &TestParameters, field: &str) -> ChaosResult
         .map_err(|_| "Invalid parameter type, expected String".to_string())?)
 }
 
+pub fn get_obj_field(parameters: &TestParameters, field: &str) -> ChaosResult<BTreeMap<String, TestParameter>> {
+    Ok(parameters
+        .get(field)
+        .ok_or(format!("Parameter {:?} not found", field))?
+        .try_into()
+        .map_err(|_| "Invalid parameter type, expected String".to_string())?)
+}
+
+pub fn get_vec_field(parameters: &TestParameters, field: &str) -> ChaosResult<Vec<TestParameter>> {
+    Ok(parameters
+        .get(field)
+        .ok_or(format!("Parameter {:?} not found", field))?
+        .try_into()
+        .map_err(|_| "Invalid parameter type, expected Vec<Param>".to_string())?)
+}
+pub fn get_vec_string_field(parameters: &TestParameters, field: &str) -> ChaosResult<Vec<String>> {
+    Ok(parameters
+        .get(field)
+        .ok_or(format!("Parameter {:?} not found", field))?
+        .try_into()
+        .map_err(|_| "Invalid parameter type, expected Vec<String>".to_string())?)
+}
+
 pub fn get_u64_field(parameters: &TestParameters, field: &str) -> ChaosResult<u64> {
     Ok(parameters
         .get(field)
@@ -240,4 +267,16 @@ pub fn get_f32_field(parameters: &TestParameters, field: &str) -> ChaosResult<f3
         .ok_or(format!("Parameter {:?} not found", field))?
         .try_into()
         .map_err(|_| "Invalid parameter type, expected String".to_string())?)
+}
+
+
+impl TestActionType {
+    /// Action to be performed by the server
+    pub fn is_server(&self) -> bool {
+        matches!(self, TestActionType::HttpRequest | TestActionType::HttpResponse | TestActionType::ExecuteServer)
+    }
+    /// Action to be performed by the agent
+    pub fn is_agent(&self) -> bool {
+        !self.is_server()
+    }
 }
