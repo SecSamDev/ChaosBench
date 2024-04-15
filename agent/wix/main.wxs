@@ -47,7 +47,7 @@
         Id='*'
         Name='ChaosBench'
         UpgradeCode='41167733-8BFD-4D9A-ABF6-D4F28A4BC2A3'
-        Manufacturer='Samuel Garcés'
+        Manufacturer='Samuel Garces'
         Language='1033'
         Codepage='1252'
         Version='$(var.Version)'>
@@ -55,7 +55,7 @@
         <Package Id='*'
             Keywords='Installer'
             Description='ChaosAgent'
-            Manufacturer='Samuel Garcés'
+            Manufacturer='Samuel Garces'
             InstallerVersion='450'
             Languages='1033'
             Compressed='yes'
@@ -75,17 +75,17 @@
                 <Directory Id='APPLICATIONFOLDER' Name='ChaosBench'>
                     <Component Id='chaos_agent_executable' Guid='*'>
                         <File
-                            Id='exe0'
+                            Id='agent_exe'
                             Name='chaos-agent.exe'
                             DiskId='1'
                             Source='$(var.CargoTargetBinDir)\agent.exe'
                             KeyPath='yes' />
-                        <ServiceInstall Id="chaos_service" Name="chaos-agent"
+                        <ServiceInstall Id="chaos_service" Name="chaosbench"
                             DisplayName="Chaos Agent service"
-                            Description="Multiplatform testing made simple" Start="auto"
+                            Description="Chaos Agent service" Start="auto"
                             Type="ownProcess" ErrorControl="normal" Account="LocalSystem"
                             Vital="yes" Interactive="no" />
-                        <ServiceControl Id="chaos_service_Control" Name="chaos-agent"
+                        <ServiceControl Id="chaos_service_Control" Name="chaosbench"
                             Start="install" Stop="both" Remove="uninstall" Wait="yes" />
                     </Component>
                 </Directory>
@@ -128,10 +128,9 @@
         <UI>
             <UIRef Id='WixUI_FeatureTree' />
 
-            <Publish Dialog='WelcomeDlg' Control='Next' Event='NewDialog' Value='CustomizeDlg'
-                Order='99'>1</Publish>
-            <Publish Dialog='CustomizeDlg' Control='Back' Event='NewDialog' Value='WelcomeDlg'
-                Order='99'>1</Publish>
+            <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+            <Publish Dialog="SetupTypeDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">1</Publish>
+            <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">1</Publish>
 
         </UI>
 

@@ -133,6 +133,13 @@ pub fn server_dir() -> PathBuf {
 pub fn executable_path(exec : &str, params : &BuildParameters) -> PathBuf {
     PathBuf::from(&params.target_dir).join(cargo_target(params)).join("release").join(exec)
 }
+pub fn msi_path(exec : &str, params : &BuildParameters) -> PathBuf {
+    PathBuf::from(&params.target_dir).join(cargo_target(params)).join("wix").join(exec)
+}
 pub fn executable_path_release(exec : &str, params : &BuildParameters) -> PathBuf {
     PathBuf::from(&params.target_dir).join("release").join(exec)
+}
+
+pub fn wix_file() -> PathBuf {
+    std::env::current_dir().unwrap().join("agent").join("wix").join("main.wxs")
 }

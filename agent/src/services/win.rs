@@ -1,4 +1,4 @@
-use std::{ffi::OsString, time::Duration};
+use std::{ffi::OsString, panic::catch_unwind, time::Duration};
 use windows_service::{service_dispatcher, define_windows_service, service_control_handler::{self, ServiceControlHandlerResult, ServiceStatusHandle}, service::{ServiceControl, ServiceStatus, ServiceType, ServiceState, ServiceControlAccept, ServiceExitCode}};
 
 use crate::{common::StopCommand, stopper::wait_for_service_signal};
@@ -19,7 +19,7 @@ pub fn run() -> Result<(), windows_service::Error> {
 #[cfg(not(feature="no_service"))]
 fn run_as_service() -> Result<(), windows_service::Error> {
     log::info!("Running ChaosAgent as service");
-    service_dispatcher::start("myservice", ffi_service_main)
+    service_dispatcher::start("chaosbench", ffi_service_main)
 }
 
 #[cfg(feature="no_service")]
@@ -55,14 +55,19 @@ fn run_service(_arguments: Vec<OsString>) -> Result<(), windows_service::Error> 
         }
     };
     #[cfg(not(feature="no_service"))]
-    let status_handle = service_control_handler::register("myservice", event_handler)?;
+    let status_handle = service_control_handler::register("chaosbench", event_handler)?;
 
     // Register system service event handler
     #[cfg(not(feature="no_service"))]
     set_service_status_as_starting(&status_handle)?;
     #[cfg(not(feature="no_service"))]
     set_service_status_as_running(&status_handle)?;
-    wait_for_service_signal(signal_s, shutdown_r);
+    let panic = catch_unwind(||  {
+        wait_for_service_signal(signal_s, shutdown_r);
+    });
+    if panic.is_err() {
+        log::error!("Service execution panicked");
+    }
     #[cfg(not(feature="no_service"))]
     set_service_status_as_stopping(&status_handle)?;
     #[cfg(not(feature="no_service"))]

@@ -10,6 +10,7 @@ type WsClient = WebSocket<MaybeTlsStream<TcpStream>>;
 
 pub fn wait_for_service_signal(signal_sender : SyncSender<StopCommand>, signal : Receiver<StopCommand>) {
     let receiver = init_logging();
+    log::info!("ChaosAgent started");
     let mut state = AgentState::new(signal_sender);
     if let Some(v) = receiver {
         state.set_log_receiver(v);
@@ -18,6 +19,7 @@ pub fn wait_for_service_signal(signal_sender : SyncSender<StopCommand>, signal :
     //on_start_service(&mut state);
     'out: loop {
         if check_shutdown_signal(&signal, &mut state) {
+            log::info!("Shutdown Signal");
             break 'out
         }
         let mut client = match create_ws_client() {
@@ -37,6 +39,7 @@ pub fn wait_for_service_signal(signal_sender : SyncSender<StopCommand>, signal :
         }
         loop {
             if check_shutdown_signal(&signal, &mut state) {
+                log::info!("Shutdown Signal");
                 break 'out
             }
             if let Err(e) = agent_loop(&mut state, &mut client) {
@@ -98,9 +101,9 @@ fn create_ws_client() -> Result<WsClient, tungstenite::Error>{
     };
     root_store.add(cert).unwrap();
     let config = Arc::new(ClientConfig::builder().with_root_certificates(root_store).with_no_client_auth());
-    let sock = TcpStream::connect(&format!("{}:{}", SERVER_ADDRESS, SERVER_PORT)).unwrap();
+    let sock = TcpStream::connect(&format!("{}:{}", SERVER_ADDRESS, SERVER_PORT)).map_err(|e| tungstenite::Error::Io(e))?;
     
-    let (client, _response) = tungstenite::client_tls_with_config(request, sock, None, Some(tungstenite::Connector::Rustls(config))).unwrap();
+    let (client, _response) = tungstenite::client_tls_with_config(request, sock, None, Some(tungstenite::Connector::Rustls(config))).map_err(|_e| tungstenite::Error::ConnectionClosed)?;
     if let MaybeTlsStream::Rustls(stream) = client.get_ref() {
         //let _ = stream.set_nonblocking(true);
         let _ = stream.sock.set_read_timeout(Some(Duration::from_secs_f32(0.2)));
