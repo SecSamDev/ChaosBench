@@ -8,12 +8,17 @@ use log4rs::encode::pattern::PatternEncoder;
 use log4rs::config::{Appender, Config, Root};
 use log4rs::encode::Encode;
 
+#[cfg(target_os="linux")]
+const LOG_LOCATION : &str = "/var/log/chaosbench/agent.log";
+#[cfg(target_os="windows")]
+const LOG_LOCATION : &str = "agent.log";
+
 #[cfg(not(feature="no_service"))]
 pub fn init_logging() -> Option<Receiver<String>> {
     let pattern = "{d(%Y-%m-%d %H:%M:%S)} | {T} | {({l}):5.5} | {m}{n}";
     let requests = FileAppender::builder()
         .encoder(Box::new(PatternEncoder::new(pattern)))
-        .build("agent.log")
+        .build(LOG_LOCATION)
         .unwrap();
     let (sender, receiver) = std::sync::mpsc::sync_channel(4096);
     let apiappender = ApiAppender::new(

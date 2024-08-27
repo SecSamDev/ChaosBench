@@ -1,6 +1,6 @@
-use std::{path::PathBuf, time::{UNIX_EPOCH, SystemTime}};
+use std::{io::Read, path::PathBuf, process::Command, time::{Duration, SystemTime, UNIX_EPOCH}};
 
-use chaos_core::{action::TestActionType, err::ChaosError, parameters::TestParameters, tasks::AgentTaskResult};
+use chaos_core::{action::TestActionType, err::{ChaosError, ChaosResult}, parameters::TestParameters, tasks::AgentTaskResult};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -29,6 +29,10 @@ pub fn now_milliseconds() -> i64 {
 #[cfg(target_os="windows")]
 pub fn get_home() -> PathBuf {
     PathBuf::from(r"C:\ProgramData\ChaosBench")
+}
+#[cfg(target_os="linux")]
+pub fn get_home() -> PathBuf {
+    PathBuf::from(r"/var/lib/chaosbench")
 }
 
 pub fn set_home() {
@@ -86,5 +90,64 @@ impl From<&AgentTaskInternal> for AgentTaskResult {
             start : v.start,
             retries : v.retries
         }
+    }
+}
+
+pub fn spawn_child_and_check_return_code(mut cmd : Command, timeout : Duration, err_msg : &str) -> ChaosResult<()> {
+    let mut out = match cmd.spawn() {
+        Ok(v) => v,
+        Err(e) => return Err(ChaosError::Other(format!("{}: {}", err_msg, e)))//Cannot start service using systemctl
+    };
+    let started = std::time::Instant::now();
+    loop {
+        let st = match out.try_wait() {
+            Ok(v) => v,
+            Err(e) => return Err(ChaosError::Other(format!("{}: {}", err_msg, e)))
+        };
+        if let Some(st) = st {
+            if st.success() {
+                return Ok(())
+            }
+        }
+        let now = std::time::Instant::now();
+        if now.duration_since(started) > timeout {
+            let _ = out.kill();
+            return Err(ChaosError::Other(format!("{}: timeout reached", err_msg)))
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+pub fn spawn_child_and_return_stdout(mut cmd : Command, timeout : Duration, err_msg : &str) -> ChaosResult<String> {
+    let mut out = match cmd.spawn() {
+        Ok(v) => v,
+        Err(e) => return Err(ChaosError::Other(format!("{}: {}", err_msg, e)))//Cannot start service using systemctl
+    };
+    let started = std::time::Instant::now();
+    loop {
+        let st = match out.try_wait() {
+            Ok(v) => v,
+            Err(e) => return Err(ChaosError::Other(format!("{}: {}", err_msg, e)))
+        };
+        if let Some(st) = st {
+            if st.success() {
+                return Ok(match out.stdout {
+                    Some(mut v) => {
+                        let mut buf = String::with_capacity(1024);
+                        if let Err(e) = v.read_to_string(&mut buf){
+                            return Err(ChaosError::Other(format!("Cannot extract stdout: {}", e)))
+                        }
+                        buf
+                    },
+                    None => String::new()
+                })
+            }
+        }
+        let now = std::time::Instant::now();
+        if now.duration_since(started) > timeout {
+            let _ = out.kill();
+            return Err(ChaosError::Other(format!("{}: timeout reached", err_msg)))
+        }
+        std::thread::sleep(Duration::from_millis(50));
     }
 }

@@ -1,0 +1,14 @@
+[Unit]
+Description=chaosbench
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=10
+User=root
+ExecStart=/usr/bin/chaosagent
+WorkingDirectory=/var/lib/chaosbench
+
+[Install]
+WantedBy=multi-user.target

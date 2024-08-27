@@ -5,7 +5,7 @@ use crate::params::BuildParameters;
 #[cfg(target_os="linux")]
 pub mod linux;
 #[cfg(target_os="linux")]
-use linux::{build_full as build_full_os, build_agent as build_agent_os};
+use linux::{build_full as build_full_os, build_agent as build_agent_os, build_server as build_server_os, build_installer as build_installer_os, build_user as build_user_os};
 
 #[cfg(target_os="windows")]
 pub mod win;
@@ -130,16 +130,66 @@ pub fn server_dir() -> PathBuf {
     std::env::current_dir().unwrap().join("server")
 }
 
+#[allow(unused)]
 pub fn executable_path(exec : &str, params : &BuildParameters) -> PathBuf {
     PathBuf::from(&params.target_dir).join(cargo_target(params)).join("release").join(exec)
 }
+#[allow(unused)]
 pub fn msi_path(exec : &str, params : &BuildParameters) -> PathBuf {
     PathBuf::from(&params.target_dir).join(cargo_target(params)).join("wix").join(exec)
 }
+#[allow(unused)]
 pub fn executable_path_release(exec : &str, params : &BuildParameters) -> PathBuf {
     PathBuf::from(&params.target_dir).join("release").join(exec)
 }
 
 pub fn wix_file() -> PathBuf {
     std::env::current_dir().unwrap().join("agent").join("wix").join("main.wxs")
+}
+
+pub fn agent_args(params : &BuildParameters) -> Vec<String> {
+    let mut features : Vec<String> = Vec::with_capacity(64);
+    if params.no_service {
+        features.push("no_service".into());
+    } 
+    let mut res : Vec<String> = ["build", "--release", "--features"].into_iter().map(|v| v.to_string()).collect();
+    res.push(features.join(","));
+    res
+}
+
+#[allow(unused_variables)]
+pub fn user_args(params : &BuildParameters) -> Vec<String> {
+    let res : Vec<String> = ["build", "--release"].into_iter().map(|v| v.to_string()).collect();
+    res
+}
+
+#[allow(unused)]
+pub fn installer_args(params : &BuildParameters) -> Vec<String> {
+    let wxs = wix_file();
+    let res : Vec<String> = ["wix", "--no-build", "--package=agent", "--nocapture"].into_iter().map(|v| v.to_string()).collect();
+    res
+}
+#[allow(unused)]
+pub fn deb_args(params : &BuildParameters) -> Vec<String> {
+    let wxs = wix_file();
+    let res : Vec<String> = ["wix", "--no-build", "--package=agent", "--nocapture"].into_iter().map(|v| v.to_string()).collect();
+    res
+}
+#[allow(unused)]
+pub fn rpm_args(params : &BuildParameters) -> Vec<String> {
+    let wxs = wix_file();
+    let res : Vec<String> = ["wix", "--no-build", "--package=agent", "--nocapture"].into_iter().map(|v| v.to_string()).collect();
+    res
+}
+#[allow(unused_variables)]
+pub fn server_args(params : &BuildParameters) -> Vec<String> {
+    let res : Vec<String> = ["build", "--release"].into_iter().map(|v| v.to_string()).collect();
+    res
+}
+#[allow(unused)]
+pub fn out_directories(params : &BuildParameters) -> (PathBuf, PathBuf, PathBuf) {
+    let x64 = PathBuf::from(&params.target_dir).join("x64");
+    let x86 = PathBuf::from(&params.target_dir).join("x86");
+    let arm64: PathBuf = PathBuf::from(&params.target_dir).join("arm64");
+    (x86, x64, arm64)
 }

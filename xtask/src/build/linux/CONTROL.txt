@@ -1,0 +1,5 @@
+Package: chaosbench
+Version: %VERSION%
+Architecture: %ARCHITECTURE%
+Maintainer: Samuel Garces Marin <samuel.garces@protonmail.com>
+Description: A simple tool for testing application packages across multiple platforms.

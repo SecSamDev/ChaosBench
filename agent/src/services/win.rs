@@ -7,72 +7,56 @@ use crate::{common::StopCommand, stopper::wait_for_service_signal};
 define_windows_service!(ffi_service_main, service_main);
 
 
-pub fn run() -> Result<(), windows_service::Error> {
-    // Register generated `ffi_service_main` with the system and start the service, blocking
-    // this thread until the service is stopped.
-    #[cfg(not(feature="no_service"))]
-    run_as_service()?;
-    #[cfg(feature="no_service")]
-    run_as_executable()?;
-    Ok(())
-}
 #[cfg(not(feature="no_service"))]
-fn run_as_service() -> Result<(), windows_service::Error> {
+fn run() -> Result<(), windows_service::Error> {
     log::info!("Running ChaosAgent as service");
     service_dispatcher::start("chaosbench", ffi_service_main)
 }
 
 #[cfg(feature="no_service")]
-fn run_as_executable() -> Result<(), windows_service::Error> {
+fn run() -> Result<(), windows_service::Error> {
     log::info!("Running ChaosAgent as executable");
-    run_service(Vec::new())
+    service_main(Vec::new())
 }
 
-fn service_main(arguments: Vec<OsString>) {
-    if let Err(_e) = run_service(arguments) {
+fn service_main(_arguments: Vec<OsString>) {
+    if let Err(_e) = super::run_generic() {
         // Handle errors in some way.
     }
 }
 
-fn run_service(_arguments: Vec<OsString>) -> Result<(), windows_service::Error> {
-    let (shutdown_s, shutdown_r) = std::sync::mpsc::sync_channel(32);
-    let signal_s = shutdown_s.clone();
-    #[cfg(not(feature="no_service"))]
+pub fn stop_handler_win_service(
+    stop_handler: Sender<StopCommand>,
+) -> ClaudiaResult<ServiceStatusHandle> {
+    // Define system service event handler that will be receiving service events.
     let event_handler = move |control_event| -> ServiceControlHandlerResult {
         match control_event {
-            ServiceControl::Stop => {
-                // Handle stop event and return control back to the system.
-                shutdown_s.send(StopCommand::Stop).unwrap();
-                ServiceControlHandlerResult::NoError
-            },
-            ServiceControl::Shutdown => {
-                shutdown_s.send(StopCommand::Shutdown).unwrap();
-                ServiceControlHandlerResult::NoError
-            },
-            // All services must accept Interrogate even if it's a no-op.
+            // Notifies a service to report its current status information to the service
+            // control manager. Always return NoError even if not implemented.
             ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
-            _ => ServiceControlHandlerResult::NotImplemented,
+            ServiceControl::Preshutdown => {
+                log::debug!("Preshutdown received");
+                let _ = stop_handler.send(super::StopCommand::Shutdown);
+                ServiceControlHandlerResult::NoError
+            }
+            ServiceControl::Shutdown => {
+                log::debug!("Shutdown received");
+                let _ = stop_handler.send(super::StopCommand::Shutdown);
+                ServiceControlHandlerResult::NoError
+            }
+            // Handle stop
+            ServiceControl::Stop => {
+                log::debug!("Stop received");
+                let _ = stop_handler.send(super::StopCommand::Stop);
+                ServiceControlHandlerResult::NoError
+            }
+            _ => ServiceControlHandlerResult::NoError,
         }
     };
-    #[cfg(not(feature="no_service"))]
-    let status_handle = service_control_handler::register("chaosbench", event_handler)?;
-
-    // Register system service event handler
-    #[cfg(not(feature="no_service"))]
-    set_service_status_as_starting(&status_handle)?;
-    #[cfg(not(feature="no_service"))]
-    set_service_status_as_running(&status_handle)?;
-    let panic = catch_unwind(||  {
-        wait_for_service_signal(signal_s, shutdown_r);
-    });
-    if panic.is_err() {
-        log::error!("Service execution panicked");
-    }
-    #[cfg(not(feature="no_service"))]
-    set_service_status_as_stopping(&status_handle)?;
-    #[cfg(not(feature="no_service"))]
-    set_service_status_as_stopped(&status_handle)?;
-    Ok(())
+    // Register system service event handler.
+    // The returned status handle should be used to report service status changes to the system.
+    service_control_handler::register(&product::SERVICE_NAME[..], event_handler)
+        .map_err(service_error_to_claudia)
 }
 
 fn set_service_status_as_starting(handler : &ServiceStatusHandle) -> Result<(), windows_service::Error> {

@@ -36,6 +36,26 @@ pub fn download_file(file_name : &str) -> ChaosResult<PathBuf> {
     }
     Ok(destination)
 }
+pub fn download_file_to(file_name : &str, destination : PathBuf) -> ChaosResult<PathBuf> {
+    log::info!("Downloading {}", file_name);
+    let file_url = format!("https://{}:{}/_agent/file/{}", SERVER_ADDRESS,SERVER_PORT, file_name);
+    let client = instance_client()?;
+    let res = client.get(&file_url).send().map_err(|e| ChaosError::Other(format!("Error getting file {}: {}", file_name, e)))?;
+    let mut res = match res.error_for_status() {
+        Ok(v) => v,
+        Err(e) => return Err(ChaosError::Other(format!("Error getting file {}: {}", file_name, e)))
+    };
+    let mut file = std::fs::File::create(&destination).map_err(|e| ChaosError::Other(format!("Cannot create file {}: {}", destination.to_str().unwrap_or_default(), e)))?;
+    let mut buffer = vec![0; 1024];
+    loop {
+        let readed = res.read(&mut buffer).map_err(|e| ChaosError::Other(format!("Cannot read download file response: {}", e)))?;
+        if readed == 0 {
+            break
+        }
+        file.write(&buffer[0..readed]).map_err(|e| ChaosError::Other(format!("Cannot write to downloaded file: {}", e)))?;
+    }
+    Ok(destination)
+}
 
 pub fn upload_file(file_name : &str, location : PathBuf) -> ChaosResult<()> {
     let file_url = format!("https://{}:{}/_agent/file/{}", SERVER_ADDRESS, SERVER_PORT, file_name);

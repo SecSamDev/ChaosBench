@@ -1,6 +1,6 @@
-use chaos_core::{action::install::{InstallParameters, InstallWithErrorParameters}, parameters::TestParameters, err::ChaosResult};
+use chaos_core::{action::install::{InstallParameters, InstallWithErrorParameters}, err::{ChaosError, ChaosResult}, parameters::TestParameters};
 
-use crate::{api::download_file, common::create_file_path_in_workspace};
+use crate::api::download_file;
 
 
 pub fn execute_install(parameters: &TestParameters) -> ChaosResult<()> {
@@ -14,10 +14,10 @@ pub fn execute_install(parameters: &TestParameters) -> ChaosResult<()> {
     for (param, value) in &parameters.parameters {
         command.arg(format!("{}={}", param, value));
     }
-    let output = match process.output() {
+    let output = match command.output() {
         Ok(v) => v,
         Err(_) => {
-            return Err(ChaosResult::Other(format!(
+            return Err(ChaosError::Other(format!(
                 "Cannot install {}", &parameters.installer
             )))
         }
@@ -34,7 +34,7 @@ pub fn execute_install(parameters: &TestParameters) -> ChaosResult<()> {
             log::error!("Error installing (stderr):\n{}", stderr);
         }
     }
-    Err(ChaosResult::Other(format!(
+    Err(ChaosError::Other(format!(
         "Cannot install {}_ exit_status={}", &parameters.installer, exit_code
     )))
 }
@@ -50,10 +50,10 @@ pub fn execute_uninstall(parameters: &TestParameters)-> ChaosResult<()> {
     for (param, value) in &parameters.parameters {
         command.arg(format!("{}={}", param, value));
     }
-    let output = match process.output() {
+    let output = match command.output() {
         Ok(v) => v,
         Err(_) => {
-            return Err(ChaosResult::Other(format!(
+            return Err(ChaosError::Other(format!(
                 "Cannot uninstall {}", &parameters.installer
             )))
         }
@@ -70,7 +70,22 @@ pub fn execute_uninstall(parameters: &TestParameters)-> ChaosResult<()> {
             log::error!("Error uninstalling (stderr):\n{}", stderr);
         }
     }
-    Err(ChaosResult::Other(format!(
+    Err(ChaosError::Other(format!(
         "Cannot uninstall {}_ exit_status={}", &parameters.installer, exit_code
     )))
+}
+
+pub fn execute_install_with_error(parameters: &TestParameters) -> ChaosResult<()>{
+    let parameters: InstallWithErrorParameters = parameters.try_into()?;
+    let mut command = std::process::Command::new(r"dpkg");
+    let file_location = download_file(&parameters.installer)?;
+    command
+        .arg("-i")
+        .arg(&file_location.to_string_lossy()[..]);
+    for (param, value) in &parameters.parameters {
+        command.arg(format!("{}={}", param, value));
+    }
+    let install_status = command.status().unwrap().code().unwrap_or_default();
+    assert_eq!(parameters.error, install_status);
+    Ok(())
 }

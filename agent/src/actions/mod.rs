@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use chaos_core::{action::{wait::WaitParameters, TestActionType}, err::{ChaosError, ChaosResult}, parameters::{TestParameter, TestParameters}};
+use chaos_core::{action::{wait::WaitParameters, TestActionType}, err::{ChaosError, ChaosResult}, parameters::TestParameters};
 
 use crate::{common::{now_milliseconds, AgentTaskInternal}, state::AgentState};
 
@@ -65,17 +65,18 @@ pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, t
         TestActionType::ResetAppEnvVars => Ok(()),
         TestActionType::StartUserSession => Ok(()),
         TestActionType::CloseUserSession => Ok(()),
-        TestActionType::Download => Ok(()),
+        TestActionType::Download => download::download_file(&parameters),
         TestActionType::Null => Ok(()),
         TestActionType::HttpRequest => Ok(()),
         TestActionType::HttpResponse => Ok(()),
         TestActionType::Wait => {
+            task.retries += 1;
             let parameters: WaitParameters = parameters.try_into()?;
             let elapsed = (now_milliseconds() - task.start).max(0).abs() as i64;
             let duration_millis = parameters.duration.as_millis() as i64;
             let remaining = duration_millis - elapsed;
             if remaining > 0 {
-                std::thread::sleep(Duration::from_millis(remaining.min(100) as u64));
+                std::thread::sleep(Duration::from_millis(remaining.max(100) as u64));
                 return Ok(())
             }
             Ok(())

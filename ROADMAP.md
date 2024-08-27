@@ -4,3 +4,4 @@
 - [ ] Real time agent logs
 - [ ] Real time application logs
 - [ ] User CLI application
+- [ ] HTTP Hooks

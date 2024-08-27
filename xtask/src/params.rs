@@ -21,13 +21,34 @@ pub enum Architecture {
     ARM64
 }
 
-#[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum TargetOs {
-    #[default]
     Windows,
     Linux,
     MacOS
 }
+
+impl Default for TargetOs {
+    fn default() -> Self {
+        default_target_os()
+    }
+}
+
+fn default_target_os() -> TargetOs {
+    #[cfg(target_os="windows")]
+    {
+        return TargetOs::Windows
+    }
+    #[cfg(target_os="linux")]
+    {
+        return TargetOs::Linux
+    }
+    #[cfg(target_os="macos")]
+    {
+        return TargetOs::MacOS
+    }
+}
+
 
 impl std::str::FromStr for Architecture {
     type Err = &'static str;
@@ -80,7 +101,7 @@ impl std::fmt::Display for TargetOs {
 pub struct BuildParameters {
     #[clap(default_value = "x64", long)]
     pub architecture : Architecture,
-    #[clap(default_value = "windows", long)]
+    #[clap(default_value_t, long)]
     pub target_os : TargetOs,
     #[clap(long)]
     pub version : Option<String>,

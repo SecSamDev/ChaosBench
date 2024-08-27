@@ -44,7 +44,7 @@ pub fn build_server(params : BuildParameters) {
     }
 
     let project_dir = super::server_dir();
-    let args = server_args(&params);
+    let args = super::server_args(&params);
     let cargo_build = super::cargo_command(&params, &project_dir, &args);
     assert!(cargo_build.success());
     if !params.sign {
@@ -74,7 +74,7 @@ pub fn build_installer(params : BuildParameters) {
     }
 
     let project_dir = super::agent_dir();
-    let args = agent_installer_args(&params);
+    let args = super::installer_args(&params);
     let cargo_build = super::cargo_command(&params, &project_dir, &args);
     assert!(cargo_build.success());
     if !params.sign {
@@ -106,7 +106,7 @@ pub fn build_agent(params : BuildParameters) {
     }
 
     let project_dir = super::agent_dir();
-    let args = agent_args(&params);
+    let args = super::agent_args(&params);
     let cargo_build = super::cargo_command(&params, &project_dir, &args);
     assert!(cargo_build.success());
     if !params.sign {
@@ -141,7 +141,7 @@ pub fn build_user(params : BuildParameters) {
     }
 
     let project_dir = super::user_dir();
-    let args = user_args(&params);
+    let args = super::user_args(&params);
     let cargo_build = super::cargo_command(&params, &project_dir, &args);
     assert!(cargo_build.success());
     if !params.sign {
@@ -156,40 +156,6 @@ pub fn build_user(params : BuildParameters) {
         }
         signtool.sign(&executable, &sign_params).expect("Cannot sign executable");
     }
-}
-
-
-fn agent_args(params : &BuildParameters) -> Vec<String> {
-    let mut features : Vec<String> = Vec::with_capacity(64);
-    if params.no_service {
-        features.push("no_service".into());
-    } 
-    let mut res : Vec<String> = ["build", "--release", "--features"].into_iter().map(|v| v.to_string()).collect();
-    res.push(features.join(","));
-    res
-}
-
-fn user_args(params : &BuildParameters) -> Vec<String> {
-    let mut res : Vec<String> = ["build", "--release"].into_iter().map(|v| v.to_string()).collect();
-    res
-}
-
-fn agent_installer_args(params : &BuildParameters) -> Vec<String> {
-    let wxs = wix_file();
-    let mut res : Vec<String> = ["wix", "--no-build", "--package=agent", "--nocapture"].into_iter().map(|v| v.to_string()).collect();
-    res
-}
-
-fn server_args(params : &BuildParameters) -> Vec<String> {
-    let mut res : Vec<String> = ["build", "--release"].into_iter().map(|v| v.to_string()).collect();
-    res
-}
-
-pub fn out_directories(params : &BuildParameters) -> (PathBuf, PathBuf, PathBuf) {
-    let x64 = PathBuf::from(&params.target_dir).join("x64");
-    let x86 = PathBuf::from(&params.target_dir).join("x86");
-    let arm64: PathBuf = PathBuf::from(&params.target_dir).join("arm64");
-    (x86, x64, arm64)
 }
 
 pub fn sign_parameters(params : &BuildParameters) -> Result<SignParams, anyhow::Error> {
