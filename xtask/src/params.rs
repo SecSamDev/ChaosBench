@@ -112,6 +112,8 @@ pub struct BuildParameters {
     /// No windows service
     #[clap(default_value = "false", long)]
     pub no_service : bool,
+    #[clap(default_value = "false", long)]
+    pub support_win7 : bool,
     // ----------------- SIGN executable ------------------
     #[clap(long, default_value = "false")]
     pub sign : bool,
@@ -124,4 +126,17 @@ pub struct BuildParameters {
     #[clap(long)]
     pub certificate_password : Option<String>,
 
+}
+
+impl Command {
+    pub fn support_win7(&self) -> bool {
+        match self {
+            Command::BuildAgent(v) => v.support_win7,
+            Command::BuildFull(v) => v.support_win7,
+            Command::BuildServer(v) => v.support_win7,
+            Command::BuildInstaller(v) => v.support_win7,
+            Command::BuildUser(v) => v.support_win7,
+            Command::Testing => false
+        }
+    }
 }

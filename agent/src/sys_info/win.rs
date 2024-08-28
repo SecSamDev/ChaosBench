@@ -10,13 +10,11 @@ use windows::{
                 TH32CS_SNAPPROCESS,
             },
             SystemInformation::{GetSystemFirmwareTable, RSMB},
-            Threading::OpenProcess,
             WindowsProgramming::{GetComputerNameW, MAX_COMPUTERNAME_LENGTH},
         },
     }
 };
 
-use crate::actions::service::open_service;
 
 pub fn get_hostname() -> ChaosResult<String> {
     let mut buffer = [0u16; MAX_COMPUTERNAME_LENGTH as usize + 1];

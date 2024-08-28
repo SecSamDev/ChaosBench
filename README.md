@@ -260,3 +260,8 @@ For the installer its needed [WixV3](https://wixtoolset.org/docs/wix3/) and [car
 ### Build user cli
 
 `cargo xtask build-user --target-dir "~\BuildDir\ChaosBench\User"`
+
+
+### Win7 Support
+
+Use `--support-win7` and make sure you have version rust toolchain with version 1.76 installed.

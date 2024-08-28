@@ -85,6 +85,13 @@ pub fn rust_toolchain_linux(params : &BuildParameters) -> &'static str {
 }
 
 pub fn rust_toolchain_win(params : &BuildParameters) -> &'static str {
+    if params.support_win7 {
+        return match params.architecture {
+            crate::params::Architecture::X64 => "1.76-x86_64-pc-windows-msvc",
+            crate::params::Architecture::X86 => "1.76-i686-pc-windows-msvc",
+            crate::params::Architecture::ARM64 => "1.76-aarch64-pc-windows-msvc",
+        }
+    }
     match params.architecture {
         crate::params::Architecture::X64 => "stable-x86_64-pc-windows-msvc",
         crate::params::Architecture::X86 => "stable-i686-pc-windows-msvc",

@@ -3,9 +3,13 @@ use params::Command;
 pub(crate) mod params;
 pub(crate) mod build;
 pub(crate) mod testing;
+pub(crate) mod version;
 
 fn main() {
     let args = Command::parse();
+    if args.support_win7() {
+        version::set_support_for_win7();
+    }
     match args {
         Command::BuildAgent(args) => {
             build::build_agent(args);

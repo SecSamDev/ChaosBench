@@ -2,15 +2,13 @@ use chaos_core::{action::metrics::{MetricsArtifact, StartMetricsForProcess, Star
 use windows::Win32::{Foundation::FILETIME, System::{ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS_EX}, Services::{QueryServiceStatusEx, SC_STATUS_PROCESS_INFO, SERVICE_STATUS_PROCESS}, SystemInformation::{GetSystemTimeAsFileTime, GlobalMemoryStatusEx, MEMORYSTATUSEX}, Threading::{GetProcessTimes, OpenProcess, PROCESS_QUERY_INFORMATION}}};
 
 use std::{
-    cell::RefCell,
-    collections::{BTreeMap, VecDeque},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     }, time::Duration
 };
 
-use crate::{actions::service::open_service, api::{upload_data, upload_metric}, common::now_milliseconds, sys_info::get_process_by_name};
+use crate::{actions::{metrics::{add_process_metric, add_service_metric}, service::open_service}, sys_info::get_process_by_name};
 
 pub fn spawn_metrics_for_process(parameters : StartMetricsForProcess, stopper : Arc<AtomicBool>) {
     let process_name = std::path::Path::new(&parameters.executable_path);
