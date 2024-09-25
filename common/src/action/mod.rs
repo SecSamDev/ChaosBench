@@ -30,6 +30,10 @@ pub enum TestActionType {
     Uninstall,
     /// Try to install the application, but cant be done
     InstallWithError,
+    /// Check that the application is installed
+    CheckInstalled,
+    /// Check that the application is not installed
+    CheckNotInstalled,
     /// Restart the application service
     RestartService,
     /// Stops the application service
@@ -40,7 +44,9 @@ pub enum TestActionType {
     RestartHost,
     /// Wait some time
     Wait,
+    /// Execute a command in the agent
     Execute,
+    /// Execute a command in the server
     ExecuteServer,
     /// Cleans the temporal folder associated with this test, not the real TMP folder
     CleanTmpFolder,
@@ -52,9 +58,9 @@ pub enum TestActionType {
     StartUserSession,
     CloseUserSession,
     /// Wait for the agent to make an HTTP request and apply a script to the request
-    HttpRequest,
+    HttpRequestInspect,
     /// Wait for the agent to make an HTTP request and apply a script to the response
-    HttpResponse,
+    HttpResponseInspect,
     /// Downloads a file
     Download,
     /// Uploads all new lines of a text file
@@ -95,6 +101,8 @@ impl<'a> From<&'a TestActionType> for &'a str {
             TestActionType::Wait => "Wait",
             TestActionType::Uninstall => "Uninstall",
             TestActionType::InstallWithError => "InstallWithError",
+            TestActionType::CheckInstalled => "CheckInstalled",
+            TestActionType::CheckNotInstalled => "CheckNotInstalled",
             TestActionType::RestartService => "RestartService",
             TestActionType::StopService => "StopService",
             TestActionType::StartService => "StartService",
@@ -112,8 +120,8 @@ impl<'a> From<&'a TestActionType> for &'a str {
             TestActionType::CloseUserSession => "CloseUserSession",
             TestActionType::Download => "Download",
             TestActionType::Null => "Null",
-            TestActionType::HttpRequest => "HttpRequest",
-            TestActionType::HttpResponse => "HttpResponse",
+            TestActionType::HttpRequestInspect => "HttpRequestInspect",
+            TestActionType::HttpResponseInspect => "HttpResponseInspect",
             TestActionType::WatchLog => "WatchLog",
             TestActionType::StopWatchLog => "StopWatchLog",
             TestActionType::UploadArtifact => "UploadArtifact",
@@ -189,8 +197,8 @@ impl From<&str> for TestActionType {
             "Null" => TestActionType::Null,
             "Wait" => TestActionType::Wait,
             "ServiceIsRunning" => TestActionType::ServiceIsRunning,
-            "HttpRequest" => TestActionType::HttpRequest,
-            "HttpResponse" => TestActionType::HttpResponse,
+            "HttpRequestInspect" => TestActionType::HttpRequestInspect,
+            "HttpResponseInspect" => TestActionType::HttpResponseInspect,
             "WatchLog" => TestActionType::WatchLog,
             "StopWatchLog" => TestActionType::StopWatchLog,
             "UploadArtifact" => TestActionType::UploadArtifact,
@@ -273,7 +281,7 @@ pub fn get_f32_field(parameters: &TestParameters, field: &str) -> ChaosResult<f3
 impl TestActionType {
     /// Action to be performed by the server
     pub fn is_server(&self) -> bool {
-        matches!(self, TestActionType::HttpRequest | TestActionType::HttpResponse | TestActionType::ExecuteServer)
+        matches!(self, TestActionType::HttpRequestInspect | TestActionType::HttpResponseInspect | TestActionType::ExecuteServer)
     }
     /// Action to be performed by the agent
     pub fn is_agent(&self) -> bool {

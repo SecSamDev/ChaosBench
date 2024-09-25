@@ -35,3 +35,9 @@ impl Display for ChaosError {
         }
     }
 }
+
+impl From<std::io::Error> for ChaosError {
+    fn from(e: std::io::Error) -> Self {
+        ChaosError::Other(format!("{}", e))
+    }
+}

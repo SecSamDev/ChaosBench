@@ -51,17 +51,13 @@ impl ServerServices for ProductionService {
         let mut task = scenario.tasks.get(next_task as usize).map(|v| v.clone())?;
         match task.action {
             // All server actions
-            TestActionType::HttpRequest | TestActionType::HttpResponse => return None,
+            TestActionType::HttpRequestInspect | TestActionType::HttpResponseInspect => return None,
             _ => {}
         }
         task.agent = agent.to_string();
         Some(task)
     }
-
-    fn upload_artifact(&self, name: &str, location: &str) {
-
-    }
-
+    
     fn hash_state(&self) -> u64 {
         let db = self.repo.db.lock().unwrap();
         let scenario = match &db.scenario {
@@ -261,5 +257,11 @@ impl ServerServices for ProductionService {
         let mut db = self.repo.db.lock().unwrap();
         db.state.get_mut(agent).map(|v| v.metric.insert(metric_name.to_string(), metrics));
         Ok(())
+    }
+
+    fn get_sever_script(&self, script : &str) -> ChaosResult<String> {
+        let script_path = std::env::current_dir().unwrap().join("workspace").join("scripts").join(script);
+        let data = std::fs::read_to_string(&script_path)?;
+        Ok(data)
     }
 }

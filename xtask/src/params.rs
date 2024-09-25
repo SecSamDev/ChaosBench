@@ -10,7 +10,7 @@ pub enum Command {
     BuildInstaller(BuildParameters),
     BuildUser(BuildParameters),
     #[default]
-    Testing
+    Test
 }
 
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
@@ -136,7 +136,7 @@ impl Command {
             Command::BuildServer(v) => v.support_win7,
             Command::BuildInstaller(v) => v.support_win7,
             Command::BuildUser(v) => v.support_win7,
-            Command::Testing => false
+            Command::Test => false
         }
     }
 }

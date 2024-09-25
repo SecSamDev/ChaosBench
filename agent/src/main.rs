@@ -10,6 +10,8 @@ pub(crate) mod logging;
 pub(crate) mod sys_info;
 pub(crate) mod db;
 pub(crate) mod api;
+#[cfg(target_os="windows")]
+pub(crate) mod reg;
 
 fn main() {
     set_home();

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{parameters::{TestParameter, TestParameters}, err::{ChaosError, ChaosResult}};
 
-use super::{names::*, get_timeout_field};
+use super::{get_string_field, get_timeout_field, names::*};
 
 const SKIP_FIELDS: [&str; 2] = [INSTALLER_LOCATION, INSTALL_ERROR];
 
@@ -31,6 +31,16 @@ pub struct InstallWithErrorParameters {
     /// 60 seconds by default
     pub timeout: Duration,
 }
+
+/// Installation check parameters: 
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct InstallCheckParameters {
+    /// Product Code GUID
+    pub product_code: Option<String>,
+    /// Name of the product
+    pub product_name: String
+}
+
 
 impl TryFrom<&TestParameters> for InstallParameters {
     type Error = ChaosError;
@@ -103,6 +113,26 @@ impl TryFrom<&TestParameters> for InstallWithErrorParameters {
     }
 }
 impl TryFrom<TestParameters> for InstallParameters {
+    type Error = ChaosError;
+    fn try_from(value: TestParameters) -> Result<Self, ChaosError> {
+        (&value).try_into()
+    }
+}
+
+impl TryFrom<&TestParameters> for InstallCheckParameters {
+    type Error = ChaosError;
+    fn try_from(params: &TestParameters) -> Result<Self, ChaosError> {
+        let product_code = get_string_field(params, "product_code").ok();
+        let product_name = get_string_field(params, "product_name")?;
+
+        Ok(InstallCheckParameters {
+            product_code,
+            product_name
+        })
+    }
+}
+
+impl TryFrom<TestParameters> for InstallCheckParameters {
     type Error = ChaosError;
     fn try_from(value: TestParameters) -> Result<Self, ChaosError> {
         (&value).try_into()

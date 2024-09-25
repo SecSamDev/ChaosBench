@@ -10,7 +10,7 @@ use crate::{actors, state::ServerState};
 
 pub fn agent_config(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/_agent/connect").route(web::get().to(connect_agent)))
-        .service(web::resource("/_agent/file/{filename}").route(web::get().to(download_file)))
+        .service(web::resource("/_agent/file/{filename}").route(web::get().to(download_file)).route(web::post().to(upload_artifact)))
         .service(web::resource("/_agent/metric/{metric_name}").route(web::post().to(upload_metrics)));
 }
 
@@ -84,4 +84,55 @@ fn agent_info(req : &HttpRequest) -> Option<ConnectAgent> {
         os : os.into(),
         ip : req.connection_info().peer_addr().unwrap_or_default().to_string()
     })
+}
+
+async fn upload_artifact(
+    request : HttpRequest,
+    stream : web::Payload,
+    file_name : Path<String>
+) -> impl Responder {
+    let headers = request.headers();
+    let agent_id = match headers.get("Agent-ID") {
+        Some(v) => {
+            v.to_str().unwrap_or_default()
+        },
+        None => return HttpResponse::Unauthorized().finish()
+    };
+    if agent_id.is_empty() {
+        return HttpResponse::Unauthorized().finish()
+    }
+    log::info!("Uploading artifact: {}", file_name);
+    let parent = std::env::current_dir().unwrap().join("workspace").join(agent_id).join("artifacts");
+    if !parent.exists() {
+        match tokio::fs::create_dir_all(&parent).await {
+            Ok(_) => {},
+            Err(e) => {
+                log::warn!("Cannot create agent artifact folder: {}", e);
+                return HttpResponse::InternalServerError().finish()
+            }
+        }
+    }
+    let file_path = parent.join(file_name.as_str());
+    let mut file = match tokio::fs::File::create(&file_path).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::warn!("Cannot create artifact file: {}", e);
+            return HttpResponse::InternalServerError().finish()
+        }
+    };
+    let byts = match stream.to_bytes().await {
+        Ok(v) => v,
+        Err(e) => {
+            log::warn!("Cannot extract bytes: {}", e);
+            return HttpResponse::InternalServerError().finish()
+        }
+    };
+    match file.write_all(&byts).await {
+        Ok(_) => {},
+        Err(e) => {
+            log::warn!("Cannot write artifact content: {}", e);
+            return HttpResponse::InternalServerError().finish()
+        }
+    };
+    HttpResponse::Ok().finish()
 }

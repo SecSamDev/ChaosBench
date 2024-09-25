@@ -1,7 +1,9 @@
-use chaos_core::{action::install::{InstallParameters, InstallWithErrorParameters}, parameters::TestParameters, err::ChaosResult};
+use chaos_core::{action::install::{InstallCheckParameters, InstallParameters, InstallWithErrorParameters}, err::{ChaosError, ChaosResult}, parameters::TestParameters};
+use windows::Win32::System::Registry::HKEY_LOCAL_MACHINE;
 
-use crate::{api::download_file, common::create_file_path_in_workspace};
+use crate::{api::download_file, common::create_file_path_in_workspace, reg::{self, RegValue}};
 
+/// Installs a MSI
 pub fn execute_install(parameters: &TestParameters) -> ChaosResult<()> {
     log::info!("Executing install");
     let parameters: InstallParameters = parameters.try_into()?;
@@ -21,7 +23,7 @@ pub fn execute_install(parameters: &TestParameters) -> ChaosResult<()> {
     log::info!("Installed {}", parameters.installer);
     Ok(())
 }
-
+/// Uninstalls a MSI
 pub fn execute_uninstall(parameters: &TestParameters)-> ChaosResult<()> {
     let parameters: InstallParameters = parameters.try_into()?;
     let mut command = std::process::Command::new(r"C:\Windows\System32\msiexec.exe");
@@ -56,6 +58,99 @@ pub fn execute_install_with_error(parameters: &TestParameters) -> ChaosResult<()
     assert_eq!(parameters.error, install_status);
     let _status = parse_msi_result(install_status);
     Ok(())
+}
+
+/// Returns Ok(()) when the product IS installed
+pub fn check_installed(parameters: &TestParameters) -> ChaosResult<()>{
+    let parameters: InstallCheckParameters = parameters.try_into()?;
+    let registry = reg::RegistryEditor::new();
+    if let Some(product_code) = &parameters.product_code {
+        if let Ok(v) = check_if_product_code_in_uninstall_registry(&product_code, &registry) {
+            if v {
+                return Ok(())
+            }
+        }
+    }
+    let installed = check_if_product_name_in_uninstall_registry(&parameters.product_name, &registry)?;
+    if installed {
+        return Ok(())
+    }
+    Err(ChaosError::Other(format!("Product is not installed")))
+}
+
+/// Returns Ok(()) when the product IS NOT installed
+pub fn check_not_installed(parameters: &TestParameters) -> ChaosResult<()> {
+    let parameters: InstallCheckParameters = parameters.try_into()?;
+    let registry = reg::RegistryEditor::new();
+    if let Some(product_code) = &parameters.product_code {
+        if let Ok(v) = check_if_product_code_in_uninstall_registry(&product_code, &registry) {
+            if !v {
+                return Ok(())
+            }
+        }
+    }
+    let installed = check_if_product_name_in_uninstall_registry(&parameters.product_name, &registry)?;
+    if !installed {
+        return Ok(())
+    }
+    Err(ChaosError::Other(format!("Product is installed")))
+}
+
+fn check_if_product_name_in_uninstall_registry(product_name : &str, registry : &reg::RegistryEditor) -> ChaosResult<bool>{
+    if let Ok(v) = check_if_name_in_uninstall_registry(product_name, registry, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall") {
+        return Ok(v)
+    }
+    check_if_name_in_uninstall_registry(product_name, registry, r"SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall")
+}
+
+fn check_if_product_code_in_uninstall_registry(product_code : &str, registry : &reg::RegistryEditor) -> ChaosResult<bool>{
+    if let Ok(v) = check_if_code_in_uninstall_registry(product_code, registry, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall") {
+        return Ok(v)
+    }
+    check_if_code_in_uninstall_registry(product_code, registry, r"SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall")
+}
+
+fn check_if_code_in_uninstall_registry(product_code : &str, registry : &reg::RegistryEditor, uninstall_key : &str) -> ChaosResult<bool>{
+    let product_code = product_code.trim();
+    let uninstall_key = registry.open_key(HKEY_LOCAL_MACHINE, uninstall_key)?;
+    let subkeys = registry.enumerate_keys(uninstall_key)?;
+    for key in subkeys {
+        if key.trim() == product_code {
+            registry.close_key(uninstall_key);
+            return Ok(true)
+        }
+    }
+    registry.close_key(uninstall_key);
+    Ok(false)
+}
+
+
+fn check_if_name_in_uninstall_registry(product_name : &str, registry : &reg::RegistryEditor, uninstall_key : &str) -> ChaosResult<bool>{
+    let product_name = product_name.trim();
+    let uninstall_key = registry.open_key(HKEY_LOCAL_MACHINE, uninstall_key)?;
+    let subkeys = registry.enumerate_keys(uninstall_key)?;
+    for key in subkeys {
+        let hkey = match registry.open_key(uninstall_key, &key) {
+            Ok(v) => v,
+            Err(_) => continue
+        };
+        let value = match registry.read_value(hkey, "DisplayName") {
+            Ok(v) => v,
+            Err(_) => {
+                registry.close_key(hkey);
+                continue
+            }
+        };
+        if let RegValue::SZ(display_name) = value {
+            if display_name.trim() == product_name {
+                registry.close_key(hkey);
+                return Ok(true)
+            }
+        }
+        registry.close_key(hkey);
+    }
+    registry.close_key(uninstall_key);
+    Ok(false)
 }
 
 pub fn parse_msi_result(status: i32) -> &'static str {

@@ -43,6 +43,8 @@ pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, t
         TestActionType::Install => installation::execute_install(&parameters),
         TestActionType::Uninstall => installation::execute_uninstall(&parameters),
         TestActionType::InstallWithError => installation::execute_install_with_error(&parameters),
+        TestActionType::CheckInstalled => installation::check_installed(&parameters),
+        TestActionType::CheckNotInstalled => installation::check_not_installed(&parameters),
         TestActionType::RestartService => service::restart_service(&parameters),
         TestActionType::StopService => service::stop_service(&parameters),
         TestActionType::StartService => service::start_service(&parameters),
@@ -67,8 +69,8 @@ pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, t
         TestActionType::CloseUserSession => Ok(()),
         TestActionType::Download => download::download_file(&parameters),
         TestActionType::Null => Ok(()),
-        TestActionType::HttpRequest => Ok(()),
-        TestActionType::HttpResponse => Ok(()),
+        TestActionType::HttpRequestInspect => Ok(()),
+        TestActionType::HttpResponseInspect => Ok(()),
         TestActionType::Wait => {
             task.retries += 1;
             let parameters: WaitParameters = parameters.try_into()?;

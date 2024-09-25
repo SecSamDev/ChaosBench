@@ -19,9 +19,6 @@ pub trait ServerServices {
     /// Gets the next scenario task for an agent
     fn get_next_task_for_agent(&self, agent : &str) -> Option<AgentTask>;
 
-    /// Uploads an agent artifact
-    fn upload_artifact(&self, name : &str, location : &str);
-
     /// Uploads an agent log
     fn agent_log(&self, agent : String, file : String, log : String);
 
@@ -61,4 +58,6 @@ pub trait ServerServices {
     fn generate_report(&self) -> ChaosResult<TestingReport>;
 
     fn set_metrics_for_agent(&self, agent : &str, metric_name : &str, metrics : MetricsArtifact) -> ChaosResult<()>;
+    /// Gets a script to be used by the server
+    fn get_sever_script(&self, script : &str) -> ChaosResult<String>;
 }

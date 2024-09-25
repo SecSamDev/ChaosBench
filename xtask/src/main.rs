@@ -26,7 +26,7 @@ fn main() {
         Command::BuildUser(args) => {
             build::build_user(args);
         },
-        Command::Testing => {
+        Command::Test => {
             testing::test_full().unwrap();
         },
     }
