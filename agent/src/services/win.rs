@@ -1,4 +1,5 @@
 use std::{ffi::OsString, sync::mpsc::SyncSender, time::Duration};
+use chaos_core::err::ChaosError;
 use windows_service::{service_dispatcher, define_windows_service, service_control_handler::{self, ServiceControlHandlerResult, ServiceStatusHandle}, service::{ServiceControl, ServiceStatus, ServiceType, ServiceState, ServiceControlAccept, ServiceExitCode}};
 
 use crate::common::StopCommand;

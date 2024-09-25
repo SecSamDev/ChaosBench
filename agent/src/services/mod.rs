@@ -7,9 +7,13 @@ mod linux;
 #[cfg(target_os="windows")]
 mod win;
 
-use win::{set_service_status_as_starting, set_service_status_as_stopping, set_service_status_as_running, set_service_status_as_stopped};
 #[cfg(target_os="windows")]
-use win::{run as run_servivce, stop_handler_win_service};
+use win::{run as run_servivce, stop_handler_win_service, set_service_status_as_starting, set_service_status_as_stopping, set_service_status_as_running, set_service_status_as_stopped};
+
+#[cfg(target_os="linux")]
+use chaos_core::err::ChaosError as Error;
+#[cfg(target_os="windows")]
+use windows_service::Error as Error;
 
 /// Runs the service
 #[cfg(target_os = "windows")]
@@ -22,7 +26,7 @@ pub fn run() {
     run_generic().unwrap();
 }
 
-fn run_generic() -> Result<(), windows_service::Error> {
+fn run_generic() -> Result<(), Error> {
     let (stop_s, stop_r) = std::sync::mpsc::sync_channel(32);
     let signal_s = stop_s.clone();
     // Register system service event handler.
