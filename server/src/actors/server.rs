@@ -3,7 +3,7 @@ use std::time::Duration;
 use actix::{
     Actor, Handler
 };
-use chaos_core::{action::{execute::ExecutionParameters, TestActionType}, err::{ChaosError, ChaosResult}, parameters::TestParameters, tasks::{AgentTask, AgentTaskResult}};
+use chaos_core::{action::execute::ExecutionParameters, err::{ChaosError, ChaosResult}, parameters::TestParameters, tasks::{AgentTask, AgentTaskResult}};
 
 use crate::{domains::server::ServerTask, state::ServerState, utils::now_milliseconds};
 
@@ -26,10 +26,10 @@ impl Handler<ServerTask> for ServerActuator {
     fn handle(&mut self, msg: ServerTask, _ctx: &mut Self::Context) -> Self::Result {
         let ServerTask { task } = msg;
         let start = now_milliseconds();
-        let result = match task.action {
-            TestActionType::ExecuteServer => execute_server_action(&task),
-            _ => return
+        if task.action.is_agent() {
+            return
         };
+        let result =execute_server_action(&task);
         self.state.services.set_task_as_executed(AgentTaskResult {
             id : task.id,
             action : task.action,
@@ -59,7 +59,7 @@ pub fn execute_server_action(task : &AgentTask) -> ChaosResult<()> {
         let now = now_milliseconds();
         if now > end {
             let _ = child.kill();
-            return Err(ChaosError::Other(format!("Execution error: Timeout reached")));
+            return Err(ChaosError::Other("Execution error: Timeout reached".to_string()));
         }
         let ex_res = match child.try_wait() {
             Ok(v) => v,

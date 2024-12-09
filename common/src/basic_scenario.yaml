@@ -46,14 +46,18 @@ parameters:
 variables:
   windows:
     application_folder: C:\Program Files\program
+  linux:
+    application_folder: \usr\lib\program
 files:
   - "SuperprogramFile.msi"
 actions:
   - name: UninstallWithUninstaller
-    action: Execute
+    action: Execute::Command
     parameters:
       windows:
         command: "${application_folder}\\uninstaller.exe --force"
+      linux:
+        command: "${application_folder}\\uninstaller --force"
 
 scenario:
   cleanup:
@@ -64,7 +68,7 @@ scene_preparation:
   phase_timeout: 10s
   cleanup:
     actions:
-      - Uninstall
+      - Package::Uninstall
       - CleanFolders
       - ResetEnvVars
       - CloseUserSession
@@ -87,24 +91,24 @@ scenes:
   - name: Simple Install/Uninstall
     description: La aplicación se debe instalar y desinstalar
     phases:
-      - Install
+      - Package::Install
       - StartUserSession
-      - Uninstall
+      - Package::Uninstall
 
   - name: Install y Uninstall desde uninstaller.exe
     description: La aplicación se debe instalar y desinstalar
     phases:
-      - Install
+      - Package::Install
       - UninstallWithUninstaller
   - name: Instalar y actualizar a través del servidor
     description: La aplicación debe actualizarse de forma automática
     phases:
-      - Install
+      - Package::Install
       - UpdateByWeb # Custom command
-      - RestartService
+      - Service::Restart
   - name: Instalar e instalar encima
     description: La aplicación se debe instalar y debe no dejar instalar encima de la que ya hay
     phases:
-      - Install
+      - Package::Install
       - InstallAlredyInstalledError # Install when its alredy installed. Must give error
-      - InstallParameterError # Install with erroneous parameters. Must give error
+      - Package::InstallWithError # Install with erroneous parameters. Must give error

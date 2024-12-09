@@ -1,6 +1,4 @@
-use std::collections::BTreeMap;
-
-use chaos_core::{action::CustomAction, parameters::{ScenarioParameters, TestParameters}, tasks::AgentTask, variables::{ScenarioVariables, TestVariables}};
+use chaos_core::{action::CustomAction, parameters::ScenarioParameters, tasks::AgentTask, variables::{ScenarioVariables, TestVariables}};
 use serde::{Deserialize, Serialize};
 
 use crate::common::AgentTaskInternal;

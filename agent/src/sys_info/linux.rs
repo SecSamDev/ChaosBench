@@ -14,9 +14,7 @@ pub fn get_system_uuid() -> ChaosResult<String> {
     if let Ok(v) = std::fs::read_to_string("/var/lib/dbus/machine-id") {
         return Ok(v)
     }
-    Err(chaos_core::err::ChaosError::Other(format!(
-        "Cannot find product_uuid"
-    )))
+    Err(chaos_core::err::ChaosError::Other("Cannot find product_uuid".into()))
 }
 
 pub fn get_hostname() -> ChaosResult<String> {
@@ -26,7 +24,5 @@ pub fn get_hostname() -> ChaosResult<String> {
     if let Ok(v) = std::env::var("COMPUTERNAME") {
         return Ok(v)
     }
-    Err(chaos_core::err::ChaosError::Other(format!(
-        "Cannot get hostname"
-    )))
+    Err(chaos_core::err::ChaosError::Other("Cannot get hostname".into()))
 }

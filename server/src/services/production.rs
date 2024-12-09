@@ -4,7 +4,7 @@ use crate::{repository::memory::MemoryRepository, utils::now_milliseconds};
 
 use super::ServerServices;
 use chaos_core::{
-    action::{metrics::MetricsArtifact, TestActionType},
+    action::metrics::MetricsArtifact,
     api::{agent::ConnectAgent, TestingReport},
     common::hash_params_and_actions,
     err::{ChaosError, ChaosResult},
@@ -48,11 +48,10 @@ impl ServerServices for ProductionService {
             },
             None => 0,
         };
-        let mut task = scenario.tasks.get(next_task as usize).map(|v| v.clone())?;
-        match task.action {
+        let mut task = scenario.tasks.get(next_task as usize).cloned()?;
+        if task.action.is_server() {
             // All server actions
-            TestActionType::HttpRequestInspect | TestActionType::HttpResponseInspect => return None,
-            _ => {}
+            return None
         }
         task.agent = agent.to_string();
         Some(task)
@@ -77,14 +76,11 @@ impl ServerServices for ProductionService {
 
     fn execute_testing_scenario(&self, scenario: String) -> ChaosResult<()> {
         let mut db = self.repo.db.lock().unwrap();
-        match &db.scenario {
-            Some(v) => {
-                return Err(ChaosError::Other(format!(
-                    "There is alredy a scenario in execution: {}",
-                    v.name
-                )))
-            }
-            None => {}
+        if let Some(v) = &db.scenario {
+            return Err(ChaosError::Other(format!(
+                "There is alredy a scenario in execution: {}",
+                v.name
+            )))
         };
         let scenario = db.scenarios.get(&scenario).ok_or(ChaosError::Unknown)?;
         db.scenario = Some(scenario.into());
@@ -126,7 +122,7 @@ impl ServerServices for ProductionService {
 
     fn list_testing_scenarios(&self) -> Vec<String> {
         let db = self.repo.db.lock().unwrap();
-        db.scenarios.keys().map(|v| v.clone()).collect()
+        db.scenarios.keys().cloned().collect()
     }
 
     fn list_scenarios(&self) -> Vec<String> {
@@ -168,7 +164,7 @@ impl ServerServices for ProductionService {
 
     fn agent_from_ip(&self, ip: &str) -> ChaosResult<ConnectAgent> {
         let db = self.repo.db.lock().unwrap();
-        for (_, agent) in &db.agents {
+        for agent in db.agents.values() {
             if agent.ip == ip {
                 return Ok(agent.clone());
             }
@@ -203,7 +199,7 @@ impl ServerServices for ProductionService {
                 }
                 last_scene = task.scene_id as i32;
                 match scenario.scenes.get(&(last_scene as u32)) {
-                    Some(v) => ret.add_h2(&v),
+                    Some(v) => ret.add_h2(v),
                     None => ret.add_h2("Unknown scene"),
                 };
                 ret.add_content("\n<details>\n<summary>Show test</summary>\n");

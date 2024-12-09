@@ -1,6 +1,7 @@
 use std::time::Duration;
 
-use chaos_core::{action::{wait::WaitParameters, TestActionType}, err::{ChaosError, ChaosResult}, parameters::TestParameters};
+use chaos_core::{action::{wait::WaitParameters, ArtifactActionType, TestActionType}, err::{ChaosError, ChaosResult}, parameters::TestParameters};
+use execute::command_execution_action;
 
 use crate::{common::{now_milliseconds, AgentTaskInternal}, state::AgentState};
 
@@ -13,6 +14,7 @@ pub mod upload;
 pub mod metrics;
 pub mod download;
 pub mod execute;
+pub mod dns;
 
 /// Ejecutar una acción que viene desde el servidor, la idea es que esto produzca un TaskResult que se pueda enviar de vuelta al servidor
 /// Además es necesario guardar el estado de la operación en una bbdd local, así como también la sobreescritura de acciones.
@@ -40,25 +42,24 @@ pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, t
     }
     parameters.replace_with_vars(state.db.get_variables());
     let res = match &action {
-        TestActionType::Install => installation::execute_install(&parameters),
-        TestActionType::Uninstall => installation::execute_uninstall(&parameters),
-        TestActionType::InstallWithError => installation::execute_install_with_error(&parameters),
-        TestActionType::CheckInstalled => installation::check_installed(&parameters),
-        TestActionType::CheckNotInstalled => installation::check_not_installed(&parameters),
-        TestActionType::RestartService => service::restart_service(&parameters),
-        TestActionType::StopService => service::stop_service(&parameters),
-        TestActionType::StartService => service::start_service(&parameters),
-        TestActionType::ServiceIsRunning => service::service_is_running(&parameters),
+        TestActionType::Package(action) => installation::package_action(action, &parameters),
+        TestActionType::Service(action) => service::service_action(action, &parameters),
+        TestActionType::Metrics(action) => metrics::metric_action(action, &parameters),
+        TestActionType::Log(action) => watchlog::watchlog_action(action, &parameters, state),
+        TestActionType::Dns(action) => dns::dns_action(action, &parameters),
+        TestActionType::Http(_) => Ok(()),
+        TestActionType::Artifact(action) => match action {
+            ArtifactActionType::Download => download::download_file(&parameters),
+            ArtifactActionType::Upload => upload::upload_artifact(&parameters),
+        },
         TestActionType::RestartHost => machine::restart_host(&parameters),
-        TestActionType::Execute => {
+        TestActionType::Execute(action) => {
             // Return if task has not finished
-            match execute::execute_command(task.id, &parameters) {
+            match command_execution_action(action, task.id, &parameters) {
                 Some(v) => v,
                 None => return Ok(())
             }
         },
-        TestActionType::ExecuteServer => Ok(()),
-        TestActionType::UploadArtifact => upload::upload_artifact(&parameters),
         TestActionType::CleanTmpFolder => Ok(()),
         TestActionType::CleanAppFolder => Ok(()),
         TestActionType::SetAppEnvVars => Ok(()),
@@ -67,14 +68,11 @@ pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, t
         TestActionType::ResetAppEnvVars => Ok(()),
         TestActionType::StartUserSession => Ok(()),
         TestActionType::CloseUserSession => Ok(()),
-        TestActionType::Download => download::download_file(&parameters),
         TestActionType::Null => Ok(()),
-        TestActionType::HttpRequestInspect => Ok(()),
-        TestActionType::HttpResponseInspect => Ok(()),
         TestActionType::Wait => {
             task.retries += 1;
             let parameters: WaitParameters = parameters.try_into()?;
-            let elapsed = (now_milliseconds() - task.start).max(0).abs() as i64;
+            let elapsed = (now_milliseconds() - task.start).max(0).abs();
             let duration_millis = parameters.duration.as_millis() as i64;
             let remaining = duration_millis - elapsed;
             if remaining > 0 {
@@ -83,15 +81,8 @@ pub fn execute_action(origin_action : TestActionType, state : &mut AgentState, t
             }
             Ok(())
         },
-        TestActionType::WatchLog => watchlog::start_listening_to_file_changes(&parameters, state),
-        TestActionType::StopWatchLog => watchlog::stop_listening_to_file_changes(&parameters),
         TestActionType::Custom(action) => Err(chaos_core::err::ChaosError::Other(format!("Custom action {} not found", action))),
-        TestActionType::StartMetricsForProcess => metrics::start_metric_for_process(&parameters),
-        TestActionType::StopMetricsForProcess => metrics::stop_metric_for_process(&parameters),
-        TestActionType::UploadProcessMetrics => metrics::upload_metric_for_process(&parameters),
-        TestActionType::StartMetricsForService => metrics::start_metric_for_service(&parameters),
-        TestActionType::StopMetricsForService => metrics::stop_metric_for_service(&parameters),
-        TestActionType::UploadServiceMetrics => metrics::upload_metric_for_service(&parameters)
+        
     };
     task.result = Some(res);
     task.end = Some(now_milliseconds());

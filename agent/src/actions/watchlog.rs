@@ -9,14 +9,21 @@ use std::{
 };
 
 use chaos_core::{
-    action::watchlog::WatchLogParameters, api::agent::AppLog, err::ChaosResult,
+    action::{watchlog::WatchLogParameters, LogActionType}, api::agent::AppLog, err::ChaosResult,
     parameters::TestParameters,
 };
 
 use crate::{state::AgentState, sys_info::get_system_uuid};
 
 thread_local! {
-    pub static FILE_HANDLES: RefCell<BTreeMap<String, Arc<AtomicBool>>> = RefCell::new(BTreeMap::new());
+    pub static FILE_HANDLES: RefCell<BTreeMap<String, Arc<AtomicBool>>> = const { RefCell::new(BTreeMap::new()) };
+}
+
+pub fn watchlog_action(action : &LogActionType, parameters: &TestParameters, state: &mut AgentState,) -> ChaosResult<()> {
+    match action {
+        LogActionType::Watch => start_listening_to_file_changes(parameters, state),
+        LogActionType::StopWatch => stop_listening_to_file_changes(parameters),
+    }
 }
 
 pub fn start_listening_to_file_changes(
@@ -89,8 +96,7 @@ fn start_file_watcher(parameters: WatchLogParameters, state: &mut AgentState) {
 
 fn stop_file_watcher(parameters: WatchLogParameters) {
     FILE_HANDLES.with_borrow_mut(|v| {
-        v.get(&parameters.file)
-            .map(|v| v.store(false, Ordering::Relaxed));
+        if let Some(v) = v.get(&parameters.file) { v.store(false, Ordering::Relaxed) }
         v.remove(&parameters.file);
     });
 }

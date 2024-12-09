@@ -56,7 +56,7 @@ impl Database {
     }
 
     pub fn set_task(&mut self, task : AgentTaskResult) {
-        let entry = self.state.entry(task.agent.clone()).or_insert(AgentSceneState::default());
+        let entry = self.state.entry(task.agent.clone()).or_default();
         entry.last_task = Some(task.id);
         entry.results.insert(task.id, task);
     }

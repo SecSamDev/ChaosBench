@@ -1,8 +1,6 @@
-use std::{process::{Child, Command}, time::Duration};
+use chaos_core::{action::service::ServiceCommand, err::ChaosResult, parameters::TestParameters};
 
-use chaos_core::{action::service::ServiceCommand, err::{ChaosError, ChaosResult}, parameters::TestParameters};
-
-use crate::common::{now_milliseconds, spawn_child_and_check_return_code};
+use crate::common::spawn_child_and_check_return_code;
 
 pub fn stop_service(parameters: &TestParameters) -> ChaosResult<()> {
     let parameters: ServiceCommand = parameters.try_into()?;

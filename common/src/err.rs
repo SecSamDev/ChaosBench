@@ -30,7 +30,7 @@ impl From<ChaosError> for String {
 impl Display for ChaosError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ChaosError::Other(v) => f.write_str(&v),
+            ChaosError::Other(v) => f.write_str(v),
             ChaosError::Unknown => f.write_str("Unknown error"),
         }
     }

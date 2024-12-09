@@ -32,10 +32,7 @@ pub fn wait_for_service_signal(signal_sender : SyncSender<StopCommand>, signal :
         };
         if !notified_start {
             // Notify of started agent
-            notified_start = match on_start_service(&mut state, &mut client) {
-                Some(v) => v,
-                None => true
-            };
+            notified_start = on_start_service(&mut state, &mut client).unwrap_or(true);
         }
         loop {
             if check_shutdown_signal(&signal, &mut state) {
@@ -101,7 +98,7 @@ fn create_ws_client() -> Result<WsClient, tungstenite::Error>{
     };
     root_store.add(cert).unwrap();
     let config = Arc::new(ClientConfig::builder().with_root_certificates(root_store).with_no_client_auth());
-    let sock = TcpStream::connect(&format!("{}:{}", SERVER_ADDRESS, SERVER_PORT)).map_err(|e| tungstenite::Error::Io(e))?;
+    let sock = TcpStream::connect(format!("{}:{}", SERVER_ADDRESS, SERVER_PORT)).map_err(tungstenite::Error::Io)?;
     
     let (client, _response) = tungstenite::client_tls_with_config(request, sock, None, Some(tungstenite::Connector::Rustls(config))).map_err(|_e| tungstenite::Error::ConnectionClosed)?;
     if let MaybeTlsStream::Rustls(stream) = client.get_ref() {
@@ -133,11 +130,7 @@ fn on_start_service(state : &mut AgentState, client : &mut WsClient) -> Option<b
 
 fn send_logs(state : &mut AgentState, client : &mut WsClient) -> Result<(), tungstenite::Error> {
     let mut total = 0;
-    loop {
-        let log = match state.try_recv_app_log() {
-            Some(v) => v,
-            None => break
-        };
+    while let Some(log) = state.try_recv_app_log() {
         total += 1;
         client.send(agent_request_to_message(&AgentRequest::AppLog(log)))?;
         if total > 20 {

@@ -69,11 +69,11 @@ pub fn string_to_duration(v : &str) -> Option<Duration> {
         }
         return Some(Duration::from_secs(chr1.to_digit(10)? as u64))
     }
-    let last_char = v.chars().rev().next()?;
+    let last_char = v.chars().next_back()?;
     let (modifier, duration) = if last_char.is_numeric() {
         (1, v.parse::<u64>().unwrap_or(1))
     }else{
-        (modifier_from_letter(last_char), (&v[0..v.len() - 1]).parse::<u64>().unwrap_or(1))
+        (modifier_from_letter(last_char), v[0..v.len() - 1].parse::<u64>().unwrap_or(1))
     };
     Some(Duration::from_secs(duration * modifier))
 }

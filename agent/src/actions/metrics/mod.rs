@@ -2,7 +2,7 @@
 pub mod win;
 use std::{cell::RefCell, collections::{BTreeMap, VecDeque}, sync::{atomic::{AtomicBool, Ordering}, Arc}, time::Duration};
 
-use chaos_core::{action::metrics::{MetricsArtifact, StartMetricsForProcess, StartMetricsForService, StopMetricsForProcess, StopMetricsForService, UploadMetricsForProcess, UploadMetricsForService}, err::{ChaosError, ChaosResult}, parameters::TestParameters};
+use chaos_core::{action::{metrics::{MetricsArtifact, StartMetricsForProcess, StartMetricsForService, StopMetricsForProcess, StopMetricsForService, UploadMetricsForProcess, UploadMetricsForService}, MetricActionType}, err::{ChaosError, ChaosResult}, parameters::TestParameters};
 #[cfg(target_os="windows")]
 pub use win::*;
 
@@ -14,8 +14,19 @@ pub use linux::*;
 use crate::common::now_milliseconds;
 
 thread_local! {
-    pub static SERVICE_THREADS: RefCell<BTreeMap<String, (Arc<AtomicBool>, MetricCalculator)>> = RefCell::new(BTreeMap::new());
-    pub static PROCESS_THREADS: RefCell<BTreeMap<String, (Arc<AtomicBool>, MetricCalculator)>> = RefCell::new(BTreeMap::new());
+    pub static SERVICE_THREADS: RefCell<BTreeMap<String, (Arc<AtomicBool>, MetricCalculator)>> = const { RefCell::new(BTreeMap::new()) };
+    pub static PROCESS_THREADS: RefCell<BTreeMap<String, (Arc<AtomicBool>, MetricCalculator)>> = const { RefCell::new(BTreeMap::new()) };
+}
+
+pub fn metric_action(action : &MetricActionType, parameters: &TestParameters) -> ChaosResult<()> {
+    match action {
+        MetricActionType::StartMetricsForProcess => start_metric_for_process(parameters),
+        MetricActionType::StopMetricsForProcess => stop_metric_for_process(parameters),
+        MetricActionType::UploadProcessMetrics => upload_metric_for_process(parameters),
+        MetricActionType::StartMetricsForService => start_metric_for_service(parameters),
+        MetricActionType::StopMetricsForService => stop_metric_for_service(parameters),
+        MetricActionType::UploadServiceMetrics => upload_metric_for_service(parameters),
+    }
 }
 
 struct MetricCalculator {
@@ -65,7 +76,7 @@ impl MetricCalculator {
 
     pub fn full_metrics(&self) -> MetricsArtifact {
         MetricsArtifact {
-            ram_samples: self.ram_samples.iter().map(|v| *v).collect(),
+            ram_samples: self.ram_samples.iter().copied().collect(),
             cpu_samples: self.cpu_samples.iter().map(|v| *v as f64).collect(),
             start_time: self.start_time,
             end_time: now_milliseconds(),
@@ -91,7 +102,7 @@ pub fn start_metric_for_service(parameters: &TestParameters) -> ChaosResult<()> 
 pub fn stop_metric_for_service(parameters: &TestParameters) -> ChaosResult<()> {
     let parameters: StopMetricsForService = parameters.try_into()?;
     let metric = SERVICE_THREADS.with_borrow_mut(|v| {
-        v.get(&parameters.service_name).map(|v| v.0.store(false, Ordering::Relaxed));
+        if let Some(v) = v.get(&parameters.service_name) { v.0.store(false, Ordering::Relaxed) }
         v.remove(&parameters.service_name).unwrap()
     });
     let avg_metrics = metric.1.calculate();
@@ -119,7 +130,7 @@ pub fn start_metric_for_process(parameters: &TestParameters) -> ChaosResult<()> 
 pub fn stop_metric_for_process(parameters: &TestParameters) -> ChaosResult<()> {
     let parameters: StopMetricsForProcess = parameters.try_into()?;
     let metric = PROCESS_THREADS.with_borrow_mut(|v| {
-        v.get(&parameters.executable_path).map(|v| v.0.store(false, Ordering::Relaxed));
+        if let Some(v) = v.get(&parameters.executable_path) { v.0.store(false, Ordering::Relaxed) }
         v.remove(&parameters.executable_path).unwrap()
     });
     let avg_metrics = metric.1.calculate();

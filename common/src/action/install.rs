@@ -54,8 +54,7 @@ impl TryFrom<&TestParameters> for InstallParameters {
         for (name, param) in install_parameters {
             if SKIP_FIELDS
                 .into_iter()
-                .find(|&v| v == name.as_str())
-                .is_some()
+                .any(|v| v == name.as_str())
             {
                 continue;
             }
@@ -93,8 +92,7 @@ impl TryFrom<&TestParameters> for InstallWithErrorParameters {
         for (name, param) in install_parameters {
             if SKIP_FIELDS
                 .into_iter()
-                .find(|&v| v == name.as_str())
-                .is_some()
+                .any(|v| v == name.as_str())
             {
                 continue;
             }

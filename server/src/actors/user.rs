@@ -163,7 +163,7 @@ fn generate_report(state : &ServerState) -> Option<UserActionResponse> {
 }
 
 fn process_user_message(msg : &[u8]) -> Option<UserAction> {
-    Some(serde_json::from_slice(msg).ok()?)
+    serde_json::from_slice(msg).ok()
 }
 fn list_agents(state : &ServerState) -> Option<UserActionResponse> {
     let scenarios = state.services.list_agents();

@@ -22,7 +22,7 @@ pub fn execute_install(parameters: &TestParameters) -> ChaosResult<()> {
             )))
         }
     };
-    let exit_code = output.status.code().map(|v| v as i32).unwrap_or(-1);
+    let exit_code = output.status.code().unwrap_or(-1);
     if output.status.success() {
         if output.status.success() {
             log::info!("Installed {}", parameters.installer);
@@ -58,7 +58,7 @@ pub fn execute_uninstall(parameters: &TestParameters)-> ChaosResult<()> {
             )))
         }
     };
-    let exit_code = output.status.code().map(|v| v as i32).unwrap_or(-1);
+    let exit_code = output.status.code().unwrap_or(-1);
     if output.status.success() {
         if output.status.success() {
             log::info!("Uninstalled {}", parameters.installer);
@@ -101,13 +101,9 @@ fn list_deb_packages() -> String {
 fn deb_package_with_name<'a>(name: &'a str, data: &'a str) -> Option<&'a str> {
     for line in data.lines() {
         if line.contains(name) {
-            let mut splited = line.split(' ');
+            let splited = line.split(' ');
             let mut first = false;
-            loop {
-                let name = match splited.next() {
-                    Some(v) => v,
-                    None => break,
-                };
+            for name in splited {
                 if name.is_empty() {
                     continue;
                 }
@@ -166,7 +162,7 @@ pub fn check_installed(parameters: &TestParameters) -> ChaosResult<()>{
     if let Some(_deb) = deb_package_with_name(&parameters.product_name, &deb_packages) {
         return Ok(())
     }
-    Err(ChaosError::Other(format!("Product is not installed")))
+    Err(ChaosError::Other("Product is not installed".into()))
 }
 
 /// Returns Ok(()) when the product IS NOT installed
@@ -180,7 +176,7 @@ pub fn check_not_installed(parameters: &TestParameters) -> ChaosResult<()> {
     if let Some(_deb) = deb_package_with_name(&parameters.product_name, &deb_packages) {
         return Ok(())
     }
-    Err(ChaosError::Other(format!("Product is not installed")))
+    Err(ChaosError::Other("Product is not installed".into()))
 }
 
 #[test]
@@ -222,7 +218,7 @@ ii  mount                         2.37.2-4ubuntu3.4                       amd64 
 ii  mtr-tiny                      0.95-1                                  amd64        Full screen ncurses traceroute tool
 ii  nano                          6.2-1                                   amd64        small, friendly text editor inspired by Pico
 "#;
-    let package_name = deb_package_with_name("chaos-bench", &packages).unwrap();
+    let package_name = deb_package_with_name("chaos-bench", packages).unwrap();
     assert_eq!("chaos-bench", package_name);
 }
 
@@ -247,6 +243,6 @@ mozilla-filesystem-1.9-30.el9.x86_64
 foomatic-db-filesystem-4.0-72.20210209.el9.noarch
 google-noto-cjk-fonts-common-20230817-2.el9.noarch
 "#;
-    let package_name = rpm_package_with_name("chaos-bench", &packages).unwrap();
+    let package_name = rpm_package_with_name("chaos-bench", packages).unwrap();
     assert_eq!("chaos-bench", package_name);
 }

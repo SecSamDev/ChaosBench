@@ -15,17 +15,12 @@ pub struct CalculatedScenario {
 
 impl From<&TestScenario> for CalculatedScenario {
     fn from(test: &TestScenario) -> Self {
-        let remote_server : Option<String> = match test.parameters.global.get(REMOTE_SERVER) {
-            Some(v) =>  Some(v.try_into().unwrap_or_default()),
-            None => None
-        };
+        let remote_server : Option<String> = test.parameters.global.get(REMOTE_SERVER).map(|v|v.try_into().unwrap_or_default());
         let mut tasks = Vec::with_capacity(test.scenes.len() * 32);
-        let mut scenes = BTreeMap::new();
-        let mut i = 0;
-        for scene in &test.scenes {
-            scenes.insert(i, scene.name.clone());
-            scene_to_tasks(scene, i, test, &mut tasks);
-            i += 1;
+        let mut scenes: BTreeMap<u32, String> = BTreeMap::new();
+        for (i, scene) in test.scenes.iter().enumerate() {
+            scenes.insert(i as u32, scene.name.clone());
+            scene_to_tasks(scene, i as u32, test, &mut tasks);
         }
 
         let default_retry = test.parameters.global.get(TASK_RETRIES).map(|v| v.try_into().unwrap_or(1u32)).unwrap_or(1u32);
@@ -57,11 +52,10 @@ impl From<&TestScenario> for CalculatedScenario {
 }
 
 fn scene_to_tasks(scene : &TestScene, scene_i : u32, scenario : &TestScenario, tasks : &mut Vec<AgentTask>) {
-    let mut i = 0;
     scene_preparation(&scenario.scene_preparation.before, scene_i, scene, scenario, tasks);
-    for phase in &scene.phases {
+    for (i, phase) in scene.phases.iter().enumerate() {
         scene_preparation(&scenario.scene_preparation.before_phase, scene_i, scene, scenario, tasks);
-        if i == scene.phases.len() as u32 - 1 {
+        if i == scene.phases.len() - 1 {
             scene_preparation(&scenario.scene_preparation.before_last, scene_i, scene, scenario, tasks);
         }
         phase_to_tasks(phase, scene_i, scene, scenario, tasks);
@@ -69,7 +63,6 @@ fn scene_to_tasks(scene : &TestScene, scene_i : u32, scenario : &TestScenario, t
             scene_preparation(&scenario.scene_preparation.after_first, scene_i, scene, scenario, tasks);
         }
         scene_preparation(&scenario.scene_preparation.after_phase, scene_i, scene, scenario, tasks);
-        i += 1;
     }
     scene_preparation(&scenario.scene_preparation.after, scene_i, scene, scenario, tasks);
 }
@@ -118,10 +111,8 @@ fn action_is_wait(action : &TestActionType, scenario : &TestScenario) -> bool {
     }
     if let TestActionType::Custom(c) = action {
         for act in &scenario.actions {
-            if &act.name == c {
-                if act.action == TestActionType::Wait {
-                    return true
-                }
+            if &act.name == c && act.action == TestActionType::Wait {
+                return true
             }
         }
     }

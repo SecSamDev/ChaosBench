@@ -80,18 +80,16 @@ pub fn read_test_scenarios() -> Vec<TestScenario> {
         std::fs::create_dir_all(&location).expect("Scenario location must be created");
     }
     let mut ret = Vec::with_capacity(32);
-    for entry in location.read_dir().expect("Must have read permissions over scenarios folder") {
-        if let Ok(entry) = entry {
-            let content = std::fs::read_to_string(entry.path()).expect("Scenario must be readable");
-            let scenario = match serde_yaml::from_str(&content) {
-                Ok(v) => v,
-                Err(e) => {
-                    log::info!("Cannot parse Scenario {}: {}", entry.file_name().to_str().unwrap_or_default(), e);
-                    continue;
-                }
-            };
-            ret.push(scenario);
-        }
+    for entry in location.read_dir().expect("Must have read permissions over scenarios folder").flatten() {
+        let content = std::fs::read_to_string(entry.path()).expect("Scenario must be readable");
+        let scenario = match serde_yaml::from_str(&content) {
+            Ok(v) => v,
+            Err(e) => {
+                log::info!("Cannot parse Scenario {}: {}", entry.file_name().to_str().unwrap_or_default(), e);
+                continue;
+            }
+        };
+        ret.push(scenario);
     }
     ret
 }

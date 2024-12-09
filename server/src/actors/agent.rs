@@ -118,5 +118,5 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for AgentConnection {
 }
 
 fn process_agent_message(msg: &[u8]) -> Option<AgentRequest> {
-    Some(serde_json::from_slice(msg).ok()?)
+    serde_json::from_slice(msg).ok()
 }

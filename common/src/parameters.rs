@@ -122,7 +122,7 @@ impl<'de> Visitor<'de> for TestParameterVisitor {
     where
         E: de::Error,
     {
-        Ok(TestParameter::I64(value.into()))
+        Ok(TestParameter::I64(value))
     }
 
     fn visit_u8<E>(self, value: u8) -> Result<Self::Value, E>
@@ -148,7 +148,7 @@ impl<'de> Visitor<'de> for TestParameterVisitor {
     where
         E: de::Error,
     {
-        Ok(TestParameter::U64(value.into()))
+        Ok(TestParameter::U64(value))
     }
     fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
     where
@@ -172,7 +172,7 @@ impl<'de> Visitor<'de> for TestParameterVisitor {
     where
         E: de::Error,
     {
-        Ok(TestParameter::F64(v.into()))
+        Ok(TestParameter::F64(v))
     }
 
     fn visit_none<E>(self) -> Result<Self::Value, E>
@@ -257,7 +257,7 @@ impl<'a> TryFrom<&'a TestParameter> for &'a str {
     fn try_from(value: &'a TestParameter) -> Result<Self, Self::Error> {
         match value {
             TestParameter::Text(v) => return Ok(v.as_str()),
-            TestParameter::Null => return Ok(""),
+            TestParameter::Null => Ok(""),
             _ => Err("Cannot convert to &str"),
         }
     }
@@ -500,7 +500,7 @@ impl TestParameter {
         match self {
             TestParameter::Text(v) => interpolate_text(v, vars),
             TestParameter::Obj(obj) => {
-                for (_, p) in obj {
+                for p in obj.values_mut() {
                     p.replace_with_vars(vars);
                 }
             },
@@ -509,17 +509,13 @@ impl TestParameter {
                     p.replace_with_vars(vars);
                 }
             },
-            _ => return
+            _ => ()
         }
     }
 }
 
 pub fn interpolate_text(template : &mut String, vars : &TestVariables) {
-    loop {
-        let (start, end, variable) = match get_next_variable_position(template) {
-            Some(v) => v,
-            None => break
-        };
+    while let Some((start, end, variable)) = get_next_variable_position(template) {
         let value = match vars.0.get(variable) {
             Some(v) => v,
             None => break
@@ -542,12 +538,31 @@ fn get_next_variable_position(template : &str) -> Option<(usize, usize, &str)> {
 }
 
 #[test]
+#[cfg(target_os="linux")]
+fn should_interpolate_parameters() {
+    use crate::action::TestActionType;
+
+    let file_content = std::fs::read_to_string("./src/basic_scenario.yaml").unwrap();
+    let basic_scene : crate::scenario::TestScenario = serde_yaml::from_str(&file_content).unwrap();
+    let first_action = basic_scene.actions.first().expect("Should get first action");
+    assert_eq!(TestActionType::Execute(crate::action::ExecutionActionType::Command), first_action.action);
+    let mut parameters : TestParameters = (&first_action.parameters).into();
+    let variables: TestVariables  = (&basic_scene.variables).into();
+    parameters.replace_with_vars(&variables);
+    let command : &str = parameters.get("command").expect("Action should have command param").try_into().expect("command parameter should be str");
+    assert_eq!("\\usr\\lib\\program\\uninstaller --force", command);
+}
+
+#[test]
+#[cfg(target_os="windows")]
 fn should_interpolate_parameters() {
     let file_content = std::fs::read_to_string("./src/basic_scenario.yaml").unwrap();
     let basic_scene : crate::scenario::TestScenario = serde_yaml::from_str(&file_content).unwrap();
-    let mut parameters : TestParameters = (&basic_scene.actions.get(0).unwrap().parameters).into();
+    let first_action = basic_scene.actions.first().expect("Should get first action");
+    assert_eq!(TestActionType::Execute(crate::action::ExecutionActionType::Command), first_action.action);
+    let mut parameters : TestParameters = (&first_action.parameters).into();
     let variables: TestVariables  = (&basic_scene.variables).into();
     parameters.replace_with_vars(&variables);
-    let command : &str = parameters.get("command").unwrap().try_into().unwrap();
+    let command : &str = parameters.get("command").expect("Action should have command param").try_into().expect("command parameter should be str");
     assert_eq!("C:\\Program Files\\program\\uninstaller.exe --force", command);
 }

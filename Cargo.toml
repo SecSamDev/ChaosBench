@@ -12,7 +12,7 @@ name = "chaos-bench"
 version = "0.1.0"
 authors = ["Samuel Garces<samuel.garces@protonmail.com>"]
 edition = "2021"
-repository = "https://github.com/SecSamDev/chaos-bench.git"
+repository = "https://github.com/SecSamDev/ChaosBench.git"
 
 [workspace.dependencies]
 anyhow = "*"

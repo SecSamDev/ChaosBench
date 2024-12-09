@@ -1,11 +1,20 @@
 use std::{cell::RefCell, process::Child, time::Duration};
 
-use chaos_core::{action::execute::ExecutionParameters, err::{ChaosError, ChaosResult}, parameters::TestParameters};
+use chaos_core::{action::{execute::ExecutionParameters, ExecutionActionType}, err::{ChaosError, ChaosResult}, parameters::TestParameters};
 
 use crate::common::now_milliseconds;
 
 thread_local! {
-    pub static CLIENT: RefCell<Option<(u32, i64, Child)>> = RefCell::new(None);
+    pub static CLIENT: RefCell<Option<(u32, i64, Child)>> = const { RefCell::new(None) };
+}
+
+pub fn command_execution_action(action : &ExecutionActionType, task_id : u32, parameters : &TestParameters) -> Option<ChaosResult<()>> {
+    match action {
+        ExecutionActionType::Command => execute_command(task_id, parameters),
+        ExecutionActionType::ServerCommand => Some(Ok(())),
+        ExecutionActionType::Script => Some(Ok(())),
+        ExecutionActionType::ServerScript => Some(Ok(())),
+    }
 }
 
 pub fn execute_command(task_id : u32, parameters : &TestParameters) -> Option<ChaosResult<()>> {
@@ -55,7 +64,7 @@ fn stop_actual_task() {
 fn try_wait_task(max_duration : Duration) -> Option<ChaosResult<()>> {
     let now = now_milliseconds();
     let max_duration_millis = max_duration.as_millis() as i64;
-    let res = CLIENT.with_borrow_mut(|v| {
+    CLIENT.with_borrow_mut(|v| {
         let (id, start, child) = v.as_mut()?;
         if *start + max_duration_millis > now {
             let _ = child.kill();
@@ -69,6 +78,5 @@ fn try_wait_task(max_duration : Duration) -> Option<ChaosResult<()>> {
             return Some(Ok(()))
         }
         Some(Err(ChaosError::Other(format!("Execution error: exit_status={}", res.code().unwrap_or_default()))))
-    });
-    res
+    })
 }

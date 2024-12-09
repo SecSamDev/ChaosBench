@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use actix_web::{http::Uri, web::{self, Data}, HttpMessage, HttpRequest, HttpResponse, HttpResponseBuilder, Responder};
-use chaos_core::{action::TestActionType, err::{ChaosError, ChaosResult}, tasks::AgentTaskResult};
+use chaos_core::{action::{HttpActionType, TestActionType}, err::{ChaosError, ChaosResult}, tasks::AgentTaskResult};
 use reqwest::{RequestBuilder, StatusCode};
 use rhai::{Engine, Scope};
 
@@ -64,12 +64,12 @@ async fn proxy_request_wrapper(
         Err(_) => Vec::new()
     };
     if let Some(task) = task {
-        if let TestActionType::HttpRequestInspect = task.action {
+        if let TestActionType::Http(HttpActionType::Request) = task.action {
             let script_name : &str = match task.parameters.get("script") {
                 Some(v) => v.try_into().unwrap_or_default(),
                 None => return Err("Cannot find HttpRequestInspect script parameter".to_string().into())
             };
-            let script = state.services.get_sever_script(&script_name)?;
+            let script = state.services.get_sever_script(script_name)?;
             if let Some(result) = run_script_when_request(&req, &script, &bytes) {
                 state.services.set_task_as_executed(AgentTaskResult {
                     scene_id : task.scene_id,
@@ -91,7 +91,7 @@ async fn proxy_request_wrapper(
         Ok(v) => v,
         Err(e) => {
             if let Some(task) = state.services.get_next_task_for_agent(&agent.id){
-                if let TestActionType::HttpResponseInspect = task.action {
+                if let TestActionType::Http(HttpActionType::Response) = task.action {
                     state.services.set_task_as_executed(AgentTaskResult {
                         scene_id : task.scene_id,
                         id : task.id,
@@ -111,12 +111,12 @@ async fn proxy_request_wrapper(
     };
     let status = response.status();
     if let Some(task) = state.services.get_next_task_for_agent(&agent.id){
-        if let TestActionType::HttpResponseInspect = task.action {
+        if let TestActionType::Http(HttpActionType::Response) = task.action {
             let script_name : &str = match task.parameters.get("script") {
                 Some(v) => v.try_into().unwrap_or_default(),
                 None => return Err("Cannot find HttpResponseInspect script parameter".to_string().into())
             };
-            let script = state.services.get_sever_script(&script_name)?;
+            let script = state.services.get_sever_script(script_name)?;
             if let Some(res) = run_script_when_response(&req, &script, response).await {
                 let (result, ret) = match res {
                     Ok(v) => (Ok(()), v),
@@ -196,7 +196,7 @@ async fn run_script_when_response(req : &HttpRequest, script : &str, response : 
 }
 
 fn eval_with_scope<T>(engine: &Engine, scope : &mut Scope, script : &str, ret : T) -> Option<ChaosResult<T>> {
-    match engine.eval_with_scope(scope, &script) {
+    match engine.eval_with_scope(scope, script) {
         Ok(v) => {
             let v : bool = v;
             if v {

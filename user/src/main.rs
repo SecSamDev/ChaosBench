@@ -120,7 +120,7 @@ fn main() -> io::Result<()> {
             .with_root_certificates(root_store)
             .with_no_client_auth(),
     );
-    let sock = TcpStream::connect(&format!("{}:{}", SERVER_ADDRESS, SERVER_PORT)).unwrap();
+    let sock = TcpStream::connect(format!("{}:{}", SERVER_ADDRESS, SERVER_PORT)).unwrap();
 
     let (client, _response) = tungstenite::client_tls_with_config(
         &route,
@@ -435,7 +435,7 @@ impl UserApp {
             let mut cs = CommandState::None;
             std::mem::swap(&mut self.command_state, &mut cs);
             match cs {
-                CommandState::None => return,
+                CommandState::None => (),
                 CommandState::CreateScenario(ls) => {
                     self.create_sceanario(ls.id.unwrap(), ls.base_id.unwrap())
                 },
@@ -726,10 +726,7 @@ struct ConsoleIterator<'a, I> where I: Iterator<Item = Row<'a>> {
 impl<'a, I> Iterator for ConsoleIterator<'a, I> where I: Iterator<Item = Row<'a>>{
     type Item = Row<'a>;
     fn next(&mut self) -> Option<Self::Item> {
-        match self.element.take() {
-            Some(v) => return Some(v),
-            None => {}
-        }
+        if let Some(v) = self.element.take() { return Some(v) }
         self.iter.next()
     }
 }

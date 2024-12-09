@@ -11,3 +11,6 @@ pub const INSTALL_PARAMETERS : &str = "install_parameters";
 pub const APP_SERVICE_NAME : &str = "service_name";
 
 pub const TASK_RETRIES : &str = "task_retries";
+
+pub const SERVER_DOMAIN : &str = "server_domain";
+pub const SERVER_IP : &str = "server_ip";

@@ -60,7 +60,7 @@ async fn upload_metrics(
     }
     log::info!("Uploading metrics: {}", metric_name);
     let parent = std::env::current_dir().unwrap().join("workspace").join(agent_id);
-    let file_path = parent.join(&format!("metric-{}.json", metric_name.as_str()));
+    let file_path = parent.join(format!("metric-{}.json", metric_name.as_str()));
     std::fs::create_dir_all(&parent).unwrap();
     let mut fs = tokio::fs::File::create(&file_path).await.unwrap();
     let buff = serde_json::to_vec_pretty(&metrics.0).unwrap();

@@ -156,7 +156,7 @@ fn sleep_error() {
 fn extract_process_cpu_times(process : u32, process_times : &mut Vec<u32>, buffer : &mut String) -> ChaosResult<(u32, u32)> {
     let res : std::io::Result<usize> = (|| {
         let mut f = std::fs::File::open(format!("/proc/{}/stat", process))?;
-        Ok(f.read_to_string(buffer)?)
+        f.read_to_string(buffer)
     })();
     let readed = match res {
         Ok(v) => v,
@@ -167,13 +167,13 @@ fn extract_process_cpu_times(process : u32, process_times : &mut Vec<u32>, buffe
     if let Some((utime, stime)) = parse_process_cpu_line(lines, process_times) {
         return Ok((utime, stime))
     }
-    Err(ChaosError::Other(format!("Cannot extract process cpu times")))
+    Err(ChaosError::Other("Cannot extract process cpu times".into()))
 }
 
 fn extract_process_ram_usage(pid : u32, buffer : &mut String)-> ChaosResult<u64> {
     let res : std::io::Result<usize> = (|| {
         let mut f = std::fs::File::open(format!("/proc/{}/status", pid))?;
-        Ok(f.read_to_string(buffer)?)
+        f.read_to_string(buffer)
     })();
     let readed = match res {
         Ok(v) => v,
@@ -189,7 +189,7 @@ fn extract_process_ram_usage(pid : u32, buffer : &mut String)-> ChaosResult<u64>
 fn extract_cpu_times(cpu_times : &mut Vec<u32>, buffer : &mut String) -> ChaosResult<(u32, u32)> {
     let res : std::io::Result<usize> = (|| {
         let mut f = std::fs::File::open("/proc/stat")?;
-        Ok(f.read_to_string(buffer)?)
+        f.read_to_string(buffer)
     })();
     let readed = match res {
         Ok(v) => v,
@@ -197,16 +197,16 @@ fn extract_cpu_times(cpu_times : &mut Vec<u32>, buffer : &mut String) -> ChaosRe
     };
     let lines = &buffer[0..readed];
     parse_cpu_lines(lines, cpu_times)?;
-    return Ok((cpu_times[0], cpu_times[1]))
+    Ok((cpu_times[0], cpu_times[1]))
 }
 
 fn parse_cpu_lines(lines : &str, cpu_times : &mut Vec<u32>) -> ChaosResult<()> {
     for line in lines.lines() {
-        if let Some(_) = parse_splited_cpu_line(line, cpu_times) {
+        if parse_splited_cpu_line(line, cpu_times).is_some() {
             return Ok(())
         }
     }
-    Err(ChaosError::Other(format!("Cannot find aggregate CPU")))
+    Err(ChaosError::Other("Cannot find aggregate CPU".into()))
 }
 
 /// Parses the result of cat /proc/stat: normal proc in usermode, nice proc in usermode, proc in kernelmode, idle, iowait, irq, sofirq
@@ -315,12 +315,8 @@ fn get_running_process_ids() -> ChaosResult<Vec<u32>> {
 }
 
 fn parse_pid_of_service(line : &str) -> ChaosResult<u32> {
-    let mut splited = line.split("MainPID=");
-    loop {
-        let n = match splited.next() {
-            Some(v) => v,
-            None => break
-        };
+    let splited = line.split("MainPID=");
+    for n in splited {
         if n.is_empty() {
             continue
         }
@@ -329,7 +325,7 @@ fn parse_pid_of_service(line : &str) -> ChaosResult<u32> {
             Err(_) => continue,
         }
     }
-    Err(ChaosError::Other(format!("Cannot extract PID of service using systemctl: MainPID not found")))
+    Err(ChaosError::Other("Cannot extract PID of service using systemctl: MainPID not found".into()))
 }
 
 #[test]
